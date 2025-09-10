@@ -1,260 +1,539 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>AbhiDesk — Realtime Drawing & Screen Share</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-:root {
-  --bg:#0f1724; --accent:#06b6d4; --muted:#9aa7b2; --glass:rgba(255,255,255,0.03);
-}
-body {
-  margin:0; font-family:Inter,Arial,sans-serif; background:linear-gradient(180deg,#071124,#081728);
-  color:#e6eef6; overflow-x:hidden;
-}
-.app {
-  max-width:1100px; margin:24px auto; padding:18px; border-radius:12px;
-  background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
-  box-shadow:0 8px 30px rgba(2,6,23,0.6); transition:all 0.3s ease;
-}
-header{display:flex; justify-content:space-between; align-items:center;}
-.user-pill {
-  background:var(--glass); padding:8px 12px; border-radius:999px;
-  color:var(--accent); font-weight:600; transition:0.3s;
-}
-.user-pill.connected {
-  box-shadow:0 0 12px var(--accent); animation:glow 1.5s infinite alternate;
-}
-@keyframes glow{0%{box-shadow:0 0 0 var(--accent);}100%{box-shadow:0 0 12px var(--accent);}}
-.controls{display:flex; gap:12px; align-items:center; margin-top:12px; flex-wrap:wrap;}
-input[type=text]{padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);
- background:transparent; color:inherit; min-width:220px; transition:0.2s;}
-input[type=text]:focus{border-color:var(--accent); outline:none;}
-button{background:var(--accent); color:#042027; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; transition:0.2s;}
-button:hover{transform:scale(1.05);}
-button.ghost{background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted);}
-.canvas-wrap{display:grid; grid-template-columns:1fr 320px; gap:16px; margin-top:16px;}
-#canvas{border-radius:8px; background:#fff; touch-action:none; display:block; max-width:100%; transition:all 0.2s;}
-.card{padding:8px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.02);}
-.status{font-size:13px; color:var(--muted); transition:0.3s;}
-video{width:100%; border-radius:8px; background:#000;}
-@media(max-width:980px){.canvas-wrap{grid-template-columns:1fr;}}
-</style>
+    <meta charset="utf-8" />
+    <title>AbhiDesk — Realtime Drawing + Screen Share</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        :root{--bg:#1a1f30;--accent:#e60073;--secondary:#00aaff;--muted:#b0b6c6;--glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.1)}
+        * { box-sizing:border-box; }
+        body { margin:0;font-family:'Poppins', sans-serif;background:linear-gradient(180deg, #101420, #161a2b);color:#e6eef6;overflow-x:hidden; }
+        .app{max-width:1200px;margin:24px auto;padding:18px;border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow:0 12px 40px rgba(0,0,0,0.5);border:1px solid var(--border)}
+        h1{font-weight:700;letter-spacing:-1px;color:var(--accent);display:flex;align-items:center;gap:8px;}
+        h1:before{content:'';display:block;width:24px;height:24px;background:var(--accent);border-radius:50%;animation:pulse 1.5s infinite;}
+        header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+        .user-pill{background:var(--glass);padding:8px 16px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border)}
+        .controls{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;border:1px solid var(--border);padding:12px;border-radius:12px;}
+        input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;transition:all 0.3s}
+        input[type=text]:focus{border-color:var(--accent);outline:none;box-shadow:0 0 8px rgba(230,0,115,0.3);}
+        button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.3s;box-shadow:0 4px 10px rgba(230,0,115,0.3)}
+        button:hover{transform:translateY(-2px);box-shadow:0 6px 15px rgba(230,0,115,0.4)}
+        button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);box-shadow:none;}
+        button.ghost:hover{transform:translateY(-2px);background:var(--glass);box-shadow:0 2px 5px rgba(0,0,0,0.2)}
+        .canvas-wrap{display:grid;grid-template-columns:1fr 360px;gap:24px;margin-top:24px}
+        #canvas{border-radius:12px;background:#fff;touch-action:none;display:block;max-width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.2);transition:transform 0.3s;}
+        #canvas.view-only{cursor:not-allowed;transform:scale(0.98);opacity:0.8;}
+        .card{padding:16px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:16px;}
+        .status{font-size:14px;color:var(--muted);margin-top:8px;}
+        video{width:100%;border-radius:12px;background:#000;border:1px solid var(--border);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
+        input[type="color"]{appearance:none;width:32px;height:32px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:transform 0.2s;}
+        input[type="color"]::-webkit-color-swatch-wrapper{padding:0;}
+        input[type="color"]::-webkit-color-swatch{border:none;border-radius:6px;}
+        input[type="color"]:hover{transform:scale(1.1);}
+        input[type="range"]{width:120px;cursor:pointer;accent-color:var(--accent);}
+        .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+        .toolbar > div{display:flex;align-items:center;gap:8px;}
+        .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;box-shadow:0 8px 30px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;border:1px solid var(--border);animation:fadeIn 0.5s;}
+        @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-40%);}to{opacity:1;transform:translate(-50%,-50%);}}
+        @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(230,0,115,0.5);}70%{box-shadow:0 0 0 10px rgba(230,0,115,0);}100%{box-shadow:0 0 0 0 rgba(230,0,115,0);}}
+        @media(max-width:1024px){.canvas-wrap{grid-template-columns:1fr}}
+    </style>
 </head>
 <body>
-<div class="app">
-<header>
-  <div>
-    <h1>AbhiDesk — Realtime Drawing & Screen Share</h1>
-    <div class="status">Collaborative whiteboard with optional screen sharing</div>
-  </div>
-  <div>Your User ID: <span id="userId" class="user-pill">...</span></div>
-</header>
+    <div class="app">
+        <header>
+            <div>
+                <h1>AbhiDesk 🚀</h1>
+                <div class="status">Realtime collaborative whiteboard</div>
+            </div>
+            <div>
+                <div class="user-pill">Your ID: <span id="userId">...</span></div>
+            </div>
+        </header>
 
-<div class="controls">
-  <div style="display:flex;gap:8px;align-items:center">
-    <input id="partnerId" type="text" placeholder="Partner User ID">
-    <button id="joinBtn">Send Invite</button>
-    <button id="createBtn" class="ghost">New ID</button>
-  </div>
-  <div style="margin-left:auto"><div id="connStatus" class="status">Not connected</div></div>
-</div>
+        <div class="controls">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
+                <button id="inviteBtn">Invite</button>
+                <button id="createBtn" class="ghost">New ID</button>
+            </div>
+            <div style="margin-left:auto"><div id="connStatus" class="status">Ready to connect...</div></div>
+        </div>
 
-<div class="canvas-wrap">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <label>Color</label>
-        <input id="color" type="color" value="#000000" style="margin-left:8px">
-        <label style="margin-left:8px">Width</label>
-        <input id="width" type="range" min="1" max="20" value="2" style="width:120px;margin-left:8px">
-        <button id="eraseBtn" class="ghost">Eraser</button>
-      </div>
-      <div>
-        <button id="undoBtn" class="ghost">Undo</button>
-        <button id="clearBtn" class="ghost">Clear</button>
-        <button id="exportBtn">Export PNG</button>
-      </div>
+        <div class="canvas-wrap">
+            <div class="card">
+                <div class="toolbar">
+                    <div>
+                        <label>Color</label>
+                        <input id="color" type="color" value="#000000">
+                    </div>
+                    <div>
+                        <label>Width</label>
+                        <input id="width" type="range" min="1" max="20" value="2">
+                    </div>
+                    <button id="eraseBtn" class="ghost">Eraser</button>
+                    <button id="clearBtn" class="ghost">Clear</button>
+                    <button id="exportBtn">Export PNG</button>
+                </div>
+
+                <div style="margin-top:16px">
+                    <canvas id="canvas" width="1000" height="600"></canvas>
+                </div>
+            </div>
+
+            <aside>
+                <div class="card">
+                    <strong>Screen Share</strong>
+                    <div style="margin-top:12px;">
+                        <button id="startShare">Start Screen Share</button>
+                        <button id="stopShare" class="ghost" disabled>Stop Share</button>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <label class="status">Remote Screen:</label>
+                        <video id="remoteVideo" autoplay playsinline></video>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <strong>Session Status</strong>
+                    <div id="debugLog" style="margin-top:8px;" class="status">Waiting for connection...</div>
+                </div>
+            </aside>
+        </div>
     </div>
-    <div style="margin-top:12px">
-      <canvas id="canvas" width="1000" height="600"></canvas>
-    </div>
-  </div>
 
-  <aside>
-    <div class="card" style="margin-bottom:10px">
-      <strong>Screen Share</strong>
-      <div style="margin-top:8px">
-        <button id="startShare" disabled>Start Screen Share</button>
-        <button id="stopShare" class="ghost" disabled>Stop Share</button>
-      </div>
-      <div style="margin-top:8px"><label class="status">Remote Screen:</label><video id="remoteVideo" autoplay playsinline></video></div>
+    <div id="inviteNotification" class="notification" style="display:none;">
+        <p><strong id="inviteUser"></strong> has invited you to a drawing session.</p>
+        <div style="display:flex;gap:12px;">
+            <button id="acceptInvite">Accept</button>
+            <button id="declineInvite" class="ghost">Decline</button>
+        </div>
     </div>
 
-    <div class="card">
-      <strong>Info & Debug</strong>
-      <div style="margin-top:8px" class="status">
-        <div id="debugLog">Open console (F12) for detailed logs.</div>
-      </div>
-    </div>
-  </aside>
-</div>
-</div>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script>
+    // ------------------ CONFIG & INIT ------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+      authDomain: "abhidesk-d26d0.firebaseapp.com",
+      projectId: "abhidesk-d26d0",
+      storageBucket: "abhidesk-d26d0.appspot.com",
+      messagingSenderId: "924205685340",
+      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+      measurementId: "G-ML9D0LTM0D"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-<script>
-// ---------- CONFIG ----------
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+    // ------------------ UI & STATE ------------------
+    const userIdEl = document.getElementById('userId');
+    let userId = localStorage.getItem('abhi_userid') || generateId();
+    function generateId() { return Math.random().toString(36).substring(2, 9); }
+    localStorage.setItem('abhi_userid', userId);
+    userIdEl.innerText = userId;
 
-// ---------- STATE ----------
-const userIdEl = document.getElementById('userId');
-let userId = localStorage.getItem('abhi_userid') || Math.random().toString(36).substring(2,9);
-localStorage.setItem('abhi_userid', userId);
-userIdEl.innerText = userId;
+    const partnerInput = document.getElementById('partnerId');
+    const inviteBtn = document.getElementById('inviteBtn');
+    const createBtn = document.getElementById('createBtn');
+    const connStatus = document.getElementById('connStatus');
+    const debugLogEl = document.getElementById('debugLog');
 
-const partnerInput = document.getElementById('partnerId');
-const joinBtn = document.getElementById('joinBtn');
-const createBtn = document.getElementById('createBtn');
-const connStatus = document.getElementById('connStatus');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const colorInput = document.getElementById('color');
+    const widthInput = document.getElementById('width');
+    const eraseBtn = document.getElementById('eraseBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const undoBtn = document.getElementById('undoBtn');
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const colorInput = document.getElementById('color');
-const widthInput = document.getElementById('width');
-const eraseBtn = document.getElementById('eraseBtn');
-const undoBtn = document.getElementById('undoBtn');
-const clearBtn = document.getElementById('clearBtn');
-const exportBtn = document.getElementById('exportBtn');
+    const startShareBtn = document.getElementById('startShare');
+    const stopShareBtn = document.getElementById('stopShare');
+    const remoteVideo = document.getElementById('remoteVideo');
 
-const startShareBtn = document.getElementById('startShare');
-const stopShareBtn = document.getElementById('stopShare');
-const remoteVideo = document.getElementById('remoteVideo');
+    const inviteNotificationEl = document.getElementById('inviteNotification');
+    const inviteUserEl = document.getElementById('inviteUser');
+    const acceptInviteBtn = document.getElementById('acceptInvite');
+    const declineInviteBtn = document.getElementById('declineInvite');
 
-let localStrokes = [], currentStroke=null, drawing=false, lastX=0,lastY=0;
-let partnerAccepted=false, currentPartner=null;
-let remoteStrokesMap = {};
-let pc=null, localStream=null, callDocRef=null;
+    // CORE STATE
+    let remoteStrokesMap = {};
+    let currentStroke = null;
+    let drawing = false, lastX = 0, lastY = 0;
+    let partnerId = null;
+    let sessionId = null;
+    let isHost = false; // Is this user the host of the session?
+    let hostStrokesListener = null;
 
-// ---------- CANVAS FIT ----------
-function fitCanvas(){ const w=Math.min(1000,Math.max(320,window.innerWidth-260)); canvas.width=w; canvas.height=w*0.6;}
-window.addEventListener('resize', fitCanvas); fitCanvas();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-// ---------- SESSION HELPERS ----------
-function docRef(id){ return db.collection('sessions').doc(id);}
-async function ensureSession(id){ const ref=docRef(id); const snap=await ref.get(); if(!snap.exists) await ref.set({strokes:[],requests:{}}); return ref;}
-
-// ---------- LISTEN ----------
-let listeners={};
-function startListen(id){
-  if(listeners[id]) return;
-  const unsub = docRef(id).onSnapshot(doc=>{
-    if(!doc.exists) return;
-    const data=doc.data();
-    remoteStrokesMap[id]=data.strokes||[];
-    if(id===userId && data.requests){
-      Object.entries(data.requests).forEach(([rid,r])=>{
-        if(r.status==='pending') showNotification(rid,r.from);
-      });
+    // ------------------ UI HELPERS ------------------
+    function updateStatus(text, isError = false) {
+        connStatus.innerText = text;
+        connStatus.style.color = isError ? '#ff4d4f' : 'var(--muted)';
     }
-  });
-  listeners[id]=unsub;
-}
 
-// ---------- NOTIFICATIONS ----------
-function showNotification(reqId, fromId){
-  if(!("Notification" in window)) return;
-  if(Notification.permission!=='granted') Notification.requestPermission();
-  const n=new Notification('AbhiDesk Invitation',{body:`${fromId} wants to connect`, requireInteraction:true});
-  n.onclick=()=>{ acceptRequest(reqId); n.close(); };
-}
+    function setDrawingMode(isAllowed) {
+        if (isAllowed) {
+            canvas.classList.remove('view-only');
+            canvas.addEventListener('mousedown', pointerDown);
+            canvas.addEventListener('mousemove', pointerMove);
+            canvas.addEventListener('mouseup', pointerUp);
+            canvas.addEventListener('mouseleave', pointerUp);
+            canvas.addEventListener('touchstart', pointerDown, { passive: false });
+            canvas.addEventListener('touchmove', pointerMove, { passive: false });
+            canvas.addEventListener('touchend', pointerUp);
+            colorInput.disabled = false;
+            widthInput.disabled = false;
+            eraseBtn.disabled = false;
+            clearBtn.disabled = false;
+        } else {
+            canvas.classList.add('view-only');
+            canvas.removeEventListener('mousedown', pointerDown);
+            canvas.removeEventListener('mousemove', pointerMove);
+            canvas.removeEventListener('mouseup', pointerUp);
+            canvas.removeEventListener('mouseleave', pointerUp);
+            canvas.removeEventListener('touchstart', pointerDown);
+            canvas.removeEventListener('touchmove', pointerMove);
+            canvas.removeEventListener('touchend', pointerUp);
+            colorInput.disabled = true;
+            widthInput.disabled = true;
+            eraseBtn.disabled = true;
+            clearBtn.disabled = true;
+        }
+    }
+    setDrawingMode(true); // Default to a drawing mode for the local user
 
-// ---------- ACCEPT / DECLINE ----------
-async function acceptRequest(reqId){
-  const ref=docRef(userId); const snap=await ref.get(); const data=snap.data();
-  if(!data.requests[reqId]) return;
-  data.requests[reqId].status='accepted';
-  await ref.update({requests:data.requests});
-  currentPartner=data.requests[reqId].from;
-  partnerAccepted=true;
-  userIdEl.classList.add('connected');
-  connStatus.innerText=`Connected with ${currentPartner}`;
-  startShareBtn.disabled=false;
-  listenPartnerStrokes(currentPartner);
-}
+    // ------------------ CANVAS & DRAWING LOGIC ------------------
+    function fitCanvas() {
+        const parentWidth = Math.min(1000, document.querySelector('.card').clientWidth - 32);
+        const aspect = 1000 / 600;
+        canvas.width = parentWidth;
+        canvas.height = Math.round(parentWidth / aspect);
+    }
+    window.addEventListener('resize', fitCanvas);
+    fitCanvas();
 
-async function declineRequest(reqId){
-  const ref=docRef(userId); const snap=await ref.get(); const data=snap.data();
-  if(!data.requests[reqId]) return;
-  data.requests[reqId].status='declined';
-  await ref.update({requests:data.requests});
-}
+    function toNormalized(x, y) {
+        const nx = Math.round((x / canvas.width) * 1000);
+        const ny = Math.round((y / canvas.height) * 600);
+        return { x: nx, y: ny };
+    }
 
-// ---------- INVITE PARTNER ----------
-joinBtn.addEventListener('click', async()=>{
-  const pid=partnerInput.value.trim(); if(!pid || pid===userId){ alert('Enter valid ID'); return;}
-  currentPartner=pid;
-  const ref=await ensureSession(currentPartner);
-  const reqId=Date.now()+'_'+userId;
-  await ref.update({[`requests.${reqId}`]:{from:userId,status:'pending'}});
-  connStatus.innerText=`Invitation sent to ${currentPartner}`;
-  ref.onSnapshot(doc=>{
-    const r=doc.data().requests[reqId];
-    if(r?.status==='accepted'){ partnerAccepted=true; connStatus.innerText=`Partner ${currentPartner} accepted`; userIdEl.classList.add('connected'); startShareBtn.disabled=false; listenPartnerStrokes(currentPartner);}
-    else if(r?.status==='declined'){ connStatus.innerText=`Partner ${currentPartner} declined`;}
-  });
-});
+    function drawStroke(st) {
+        if (!st || !st.points || st.points.length === 0) return;
+        ctx.save();
+        ctx.lineWidth = st.width || 2;
+        ctx.strokeStyle = st.color || '#000';
+        ctx.beginPath();
+        ctx.moveTo(st.points[0].x * (canvas.width / 1000), st.points[0].y * (canvas.height / 600));
+        for (let i = 1; i < st.points.length; i++) {
+            const p = st.points[i];
+            ctx.lineTo(p.x * (canvas.width / 1000), p.y * (canvas.height / 600));
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
 
-function listenPartnerStrokes(pid){
-  const ref=docRef(pid);
-  ref.onSnapshot(doc=>{
-    if(!doc.exists) return;
-    remoteStrokesMap[pid]=doc.data().strokes||[];
-  });
-}
+    function pointerDown(e) {
+        e.preventDefault();
+        drawing = true;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        currentStroke = { color: colorInput.value, width: parseInt(widthInput.value, 10), points: [toNormalized(x, y)] };
+        lastX = x; lastY = y;
+    }
 
-// ---------- DRAWING ----------
-function toNorm(x,y){ return {x:Math.round(x/canvas.width*1000), y:Math.round(y/canvas.height*600)};}
-function beginStroke(x,y){ currentStroke={color:colorInput.value, width:parseInt(widthInput.value), points:[{x,y}]}; localStrokes.push(currentStroke);}
-function pushPoint(x,y){ if(!currentStroke) return; currentStroke.points.push({x,y});}
-async function endStroke(){ if(!currentStroke || !partnerAccepted) {currentStroke=null; return;}
-  try{ await docRef(currentPartner||userId).update({strokes:firebase.firestore.FieldValue.arrayUnion(currentStroke)});}catch(e){console.error(e);} currentStroke=null;
-}
-function drawStroke(st){ if(!st||!st.points) return; ctx.save(); ctx.lineWidth=st.width||2; ctx.strokeStyle=st.color||'#000'; ctx.beginPath(); ctx.moveTo(st.points[0].x*(canvas.width/1000), st.points[0].y*(canvas.height/600)); for(let p,i=1;i<st.points.length;i++){ p=st.points[i]; ctx.lineTo(p.x*(canvas.width/1000), p.y*(canvas.height/600)); } ctx.stroke(); ctx.restore(); }
+    function pointerMove(e) {
+        if (!drawing || !isHost) return; // Only host can draw
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        currentStroke.points.push(toNormalized(x, y));
+        ctx.save();
+        ctx.lineWidth = parseInt(widthInput.value, 10);
+        ctx.strokeStyle = colorInput.value;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.restore();
+        lastX = x; lastY = y;
+    }
 
-canvas.addEventListener('mousedown', e=>{ if(!partnerAccepted) return; drawing=true; const r=canvas.getBoundingClientRect(); const x=e.clientX-r.left; const y=e.clientY-r.top; const p=toNorm(x,y); beginStroke(p.x,p.y); lastX=x; lastY=y;});
-canvas.addEventListener('mousemove', e=>{ if(!drawing||!partnerAccepted) return; const r=canvas.getBoundingClientRect(); const x=e.clientX-r.left; const y=e.clientY-r.top; const p=toNorm(x,y); pushPoint(p.x,p.y); ctx.save(); ctx.lineWidth=parseInt(widthInput.value); ctx.strokeStyle=colorInput.value; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); ctx.restore(); lastX=x; lastY=y;});
-canvas.addEventListener('mouseup', endStroke);
-canvas.addEventListener('mouseleave', endStroke);
+    async function pointerUp() {
+        if (!drawing || !isHost) return;
+        drawing = false;
+        if (currentStroke && sessionId) {
+            try {
+                const ref = db.collection('sessions').doc(sessionId);
+                await ref.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) });
+            } catch (err) {
+                console.error('Firestore write error:', err);
+                updateStatus('Firestore write failed.', true);
+            }
+        }
+        currentStroke = null;
+    }
 
-// ---------- TOOLS ----------
-eraseBtn.addEventListener('click', ()=>{ colorInput.value='#ffffff'; });
-undoBtn.addEventListener('click', ()=>{ localStrokes.pop(); });
-clearBtn.addEventListener('click', async()=>{ await docRef(currentPartner||userId).set({strokes:[]}); remoteStrokesMap={}; });
-exportBtn.addEventListener('click', ()=>{ const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`board_${Date.now()}.png`; a.click(); });
+    canvas.addEventListener('mousedown', pointerDown);
+    canvas.addEventListener('mousemove', pointerMove);
+    canvas.addEventListener('mouseup', pointerUp);
+    canvas.addEventListener('mouseleave', pointerUp);
+    canvas.addEventListener('touchstart', pointerDown, { passive: false });
+    canvas.addEventListener('touchmove', pointerMove, { passive: false });
+    canvas.addEventListener('touchend', pointerUp);
 
-// ---------- RENDER LOOP ----------
-function renderLoop(){ ctx.clearRect(0,0,canvas.width,canvas.height); Object.values(remoteStrokesMap).forEach(s=>s.forEach(drawStroke)); localStrokes.forEach(drawStroke); requestAnimationFrame(renderLoop);}
-renderLoop();
+    // ------------------ FIRESTORE & SESSION LOGIC ------------------
+    async function startListeningForStrokes() {
+        if (!sessionId || hostStrokesListener) return;
+        const ref = db.collection('sessions').doc(sessionId);
+        hostStrokesListener = ref.onSnapshot(docSnap => {
+            if (!docSnap.exists) {
+                remoteStrokesMap[sessionId] = [];
+                return;
+            }
+            const data = docSnap.data() || {};
+            remoteStrokesMap[sessionId] = data.strokes || [];
+            if (isHost && data.strokes && data.strokes.length > 0) {
+                // Ensure local strokes are in sync if needed, though this is primarily for guest.
+            }
+        }, err => {
+            console.error('onSnapshot error:', err);
+            updateStatus('Firestore listen failed (check rules / domain)', true);
+        });
+        console.log('Listening to session:', sessionId);
+    }
 
-// ---------- SCREEN SHARE ----------
-startShareBtn.addEventListener('click', async()=>{
-  if(!partnerAccepted){ alert('Partner must accept'); return; }
-  startShareBtn.disabled=true; stopShareBtn.disabled=false;
-  try{ localStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false}); } catch(e){ alert('Screen denied'); startShareBtn.disabled=false; stopShareBtn.disabled=true; return;}
-  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  const remoteStream=new MediaStream();
-  pc.ontrack=ev=>{ ev.streams[0].getTracks().forEach(tr=>remoteStream.addTrack(tr)); remoteVideo.srcObject=remoteStream; };
-});
-stopShareBtn.addEventListener('click', ()=>{ if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null;} if(pc){pc.close(); pc=null;} startShareBtn.disabled=false; stopShareBtn.disabled=true; remoteVideo.srcObject=null; });
-</script>
+    async function stopListeningForStrokes() {
+        if (hostStrokesListener) {
+            hostStrokesListener();
+            hostStrokesListener = null;
+        }
+        remoteStrokesMap = {};
+    }
+
+    async function createNewSession(partnerId, status) {
+        const id = `${userId}_${partnerId}_${Date.now()}`;
+        try {
+            const sessionRef = db.collection('sessions').doc(id);
+            await sessionRef.set({
+                hostId: userId,
+                guestId: partnerId,
+                status: status,
+                strokes: [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            sessionId = id;
+            updateStatus('Session created. Waiting for partner to accept...');
+            console.log('Created session:', id);
+            return id;
+        } catch (e) {
+            console.error('Error creating session:', e);
+            updateStatus('Failed to create session.', true);
+            return null;
+        }
+    }
+
+    // ------------------ INVITATION FLOW ------------------
+    inviteBtn.addEventListener('click', async () => {
+        const pid = partnerInput.value.trim();
+        if (!pid) { alert('Please enter a partner ID.'); return; }
+        if (pid === userId) { alert('You cannot invite yourself.'); return; }
+
+        partnerId = pid;
+        isHost = true;
+        setDrawingMode(true);
+        updateStatus(`Sending invitation to ${partnerId}...`);
+
+        const inviteRef = db.collection('invites').doc(partnerId);
+        await inviteRef.set({
+            senderId: userId,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending'
+        });
+    });
+
+    createBtn.addEventListener('click', () => {
+        userId = generateId();
+        localStorage.setItem('abhi_userid', userId);
+        userIdEl.innerText = userId;
+        updateStatus('New ID created. Ready to connect.');
+        // Reset all state
+        partnerId = null;
+        sessionId = null;
+        isHost = false;
+        stopListeningForStrokes();
+        stopScreenShare();
+        setDrawingMode(true);
+    });
+
+    // Listen for incoming invitations
+    db.collection('invites').doc(userId).onSnapshot(async (docSnap) => {
+        const data = docSnap.data();
+        if (data && data.status === 'pending') {
+            inviteUserEl.innerText = data.senderId;
+            inviteNotificationEl.style.display = 'flex';
+        }
+    });
+
+    acceptInviteBtn.addEventListener('click', async () => {
+        inviteNotificationEl.style.display = 'none';
+        const inviteRef = db.collection('invites').doc(userId);
+        const data = (await inviteRef.get()).data();
+        if (!data || data.status !== 'pending') return;
+
+        isHost = false;
+        partnerId = data.senderId;
+        setDrawingMode(false);
+        updateStatus(`Accepted invitation from ${partnerId}. You are in view-only mode.`);
+
+        // Now, we create the session doc after acceptance
+        sessionId = await createNewSession(partnerId, 'active');
+        if (sessionId) {
+            startListeningForStrokes();
+            // Trigger screen share answer flow for the guest
+            startScreenShareAsGuest(partnerId, userId);
+        }
+    });
+
+    declineInviteBtn.addEventListener('click', async () => {
+        inviteNotificationEl.style.display = 'none';
+        const inviteRef = db.collection('invites').doc(userId);
+        await inviteRef.delete();
+        updateStatus('Invitation declined.');
+    });
+
+    // ------------------ CANVAS TOOLS ------------------
+    eraseBtn.addEventListener('click', () => { colorInput.value = '#ffffff'; });
+    clearBtn.addEventListener('click', async () => {
+        if (!isHost || !sessionId) return;
+        try {
+            await db.collection('sessions').doc(sessionId).update({ strokes: [] });
+            remoteStrokesMap[sessionId] = [];
+            updateStatus('Canvas cleared.');
+        } catch (e) {
+            console.error('Clear error:', e);
+            updateStatus('Failed to clear canvas.', true);
+        }
+    });
+    exportBtn.addEventListener('click', () => {
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `board_${Date.now()}.png`;
+        a.click();
+    });
+
+    // ------------------ WEBRTC SCREEN SHARE ------------------
+    let pc = null, localStream = null, callDocRef = null;
+
+    async function stopScreenShare() {
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        if (pc) { pc.close(); pc = null; }
+        startShareBtn.disabled = false;
+        stopShareBtn.disabled = true;
+        updateStatus('Screen share stopped.');
+    }
+    stopShareBtn.addEventListener('click', stopScreenShare);
+
+    // Host starts screen share
+    startShareBtn.addEventListener('click', async () => {
+        if (!isHost || !partnerId) { alert('You must be the host and connected to a partner to start sharing.'); return; }
+        startShareBtn.disabled = true;
+        stopShareBtn.disabled = false;
+        try {
+            localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        } catch (e) {
+            alert('Screen share denied or not supported.');
+            startShareBtn.disabled = false;
+            stopShareBtn.disabled = true;
+            return;
+        }
+
+        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+        // Create call doc
+        callDocRef = db.collection('calls').doc(sessionId);
+        const offerCandidates = callDocRef.collection('offerCandidates');
+        const answerCandidates = callDocRef.collection('answerCandidates');
+
+        pc.onicecandidate = e => { if (e.candidate) offerCandidates.add(e.candidate.toJSON()); };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await callDocRef.set({ offer: { type: offer.type, sdp: offer.sdp }, caller: userId, callee: partnerId });
+        
+        callDocRef.onSnapshot(async snap => {
+            const data = snap.data();
+            if (data && data.answer && !pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+        });
+        answerCandidates.onSnapshot(snap => {
+            snap.docChanges().forEach(async ch => {
+                if (ch.type === 'added') {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch (e) { console.error(e); }
+                }
+            });
+        });
+
+        localStream.getVideoTracks()[0].onended = () => { stopScreenShare(); };
+        updateStatus('Screen share started. Your partner can now see your screen.');
+    });
+
+    // Guest listens for incoming calls
+    async function startScreenShareAsGuest(callerId, calleeId) {
+        const callsCol = db.collection('calls');
+        callsCol.where('callee', '==', calleeId).onSnapshot(snapshot => {
+            snapshot.docChanges().forEach(async change => {
+                if (change.type === 'added' && change.doc.id.includes(callerId)) {
+                    const data = change.doc.data();
+                    if (!data) return;
+                    const remoteCallRef = db.collection('calls').doc(change.doc.id);
+                    const offer = data.offer;
+                    const pc2 = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                    const inboundStream = new MediaStream();
+                    pc2.ontrack = (evt) => {
+                        evt.streams[0].getTracks().forEach(t => inboundStream.addTrack(t));
+                        remoteVideo.srcObject = inboundStream;
+                    };
+                    const answerCandidates = remoteCallRef.collection('answerCandidates');
+                    const offerCandidates = remoteCallRef.collection('offerCandidates');
+                    pc2.onicecandidate = e => { if (e.candidate) answerCandidates.add(e.candidate.toJSON()); };
+                    await pc2.setRemoteDescription(new RTCSessionDescription(offer));
+                    const answer = await pc2.createAnswer();
+                    await pc2.setLocalDescription(answer);
+                    await remoteCallRef.update({ answer: { type: answer.type, sdp: answer.sdp } });
+                    offerCandidates.onSnapshot(snap2 => {
+                        snap2.docChanges().forEach(async ch => {
+                            if (ch.type === 'added') {
+                                try { await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch (e) { console.error(e); }
+                            }
+                        });
+                    });
+                    updateStatus(`Receiving screen-share from ${data.caller}.`);
+                }
+            });
+        });
+    }
+
+    // ------------------ RENDER LOOP ------------------
+    (function renderLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        Object.keys(remoteStrokesMap).forEach(sid => {
+            const list = remoteStrokesMap[sid] || [];
+            list.forEach(st => drawStroke(st));
+        });
+        requestAnimationFrame(renderLoop);
+    })();
+    </script>
 </body>
 </html>
