@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Realtime Drawing + Screen Share (Advanced)</title>
+  <title>Realtime Drawing + Screen Share (Fixed)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -145,12 +145,10 @@
   // ---------- IDs ----------
   const userIdEl = document.getElementById('userId');
   let userId = localStorage.getItem('abhi_userid') || generateId();
+  function generateId(){ return Math.random().toString(36).substring(2,9); }
+  // store and show
   localStorage.setItem('abhi_userid', userId);
   userIdEl.innerText = userId;
-
-  function generateId(){
-    return Math.random().toString(36).substring(2,9);
-  }
 
   // UI elements
   const partnerInput = document.getElementById('partnerId');
@@ -174,6 +172,9 @@
   const stopShareBtn = document.getElementById('stopShare');
   const remoteVideo = document.getElementById('remoteVideo');
 
+  // ---------- FIX: declare remoteStrokesMap early to avoid TDZ errors ----------
+  let remoteStrokesMap = {}; // sessionId => strokes []
+
   // Drawing state
   let drawing=false, lastX=0, lastY=0;
   let currentStroke=null;
@@ -181,13 +182,18 @@
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
+  // default connected session => your own id (so drawing without partner works)
+  let currentPartner = null;
+  let currentConnectedSession = userId;
+
   // scale handling (so canvas looks good on high-dpi)
   function fitCanvas(){
     const parentWidth = Math.min(1000, Math.max(320, window.innerWidth - 260));
     const aspect = 1000/600;
     canvas.width = parentWidth;
     canvas.height = Math.round(parentWidth / aspect);
-    redrawLocalAndRemote(); // re-render after resize
+    // re-render after resize
+    redrawLocalAndRemote();
   }
   window.addEventListener('resize', fitCanvas);
   fitCanvas();
@@ -227,29 +233,32 @@
     if(!currentStroke) return;
     currentStroke.points.push({x,y});
   }
-  function endStroke(sessionId){
+  async function endStroke(sessionId){
     if(!currentStroke) return;
-    // Save to Firestore using arrayUnion to avoid overwriting
     const payload = {...currentStroke};
-    docRefForSession(sessionId).update({
-      strokes: firebase.firestore.FieldValue.arrayUnion(payload)
-    }).catch(async (err)=>{
+    try{
+      await docRefForSession(sessionId).update({
+        strokes: firebase.firestore.FieldValue.arrayUnion(payload)
+      });
+    }catch(err){
       // if update failed (doc may not exist) -> set
       await docRefForSession(sessionId).set({strokes:[payload]});
-    });
+    }
     currentStroke = null;
   }
 
   // Local redraw combined with remote strokes
-  let remoteStrokesMap = {}; // sessionId => strokes []
   function redrawLocalAndRemote(){
-    // clear
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    // draw remote strokes first (lighter)
+    // draw remote strokes first (from all sessions we listen to)
     Object.keys(remoteStrokesMap).forEach(sid=>{
       const list = remoteStrokesMap[sid]||[];
       list.forEach(st=>drawStroke(st));
     });
+    // if user has a currentStroke in progress, draw it (scaled)
+    if(currentStroke && currentStroke.points && currentStroke.points.length>0){
+      drawStroke(currentStroke);
+    }
   }
   function drawStroke(st){
     if(!st.points || st.points.length===0) return;
@@ -257,6 +266,7 @@
     ctx.lineWidth = st.width || 2;
     ctx.strokeStyle = st.color || '#000';
     ctx.beginPath();
+    // points are normalized to 1000x600
     ctx.moveTo(st.points[0].x * (canvas.width / 1000), st.points[0].y * (canvas.height / 600));
     for(let i=1;i<st.points.length;i++){
       const p = st.points[i];
@@ -268,7 +278,6 @@
 
   // Convert pointer coordinate into normalized system (saves bandwidth)
   function toNormalized(x,y){
-    // store relative coordinates based on 1000x600 canonical canvas
     const nx = Math.round((x / canvas.width) * 1000);
     const ny = Math.round((y / canvas.height) * 600);
     return {x: nx, y: ny};
@@ -293,7 +302,7 @@
     const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
     const n = toNormalized(x,y);
     pushPoint(n.x,n.y);
-    // draw locally incremental
+    // draw locally incremental (screen coords)
     ctx.save();
     ctx.lineWidth = parseInt(widthInput.value,10);
     ctx.strokeStyle = colorInput.value;
@@ -307,7 +316,7 @@
   async function pointerUp(e){
     if(!drawing) return;
     drawing = false;
-    // store stroke in own session document
+    // store stroke in own session document (either connected session or own userId)
     await endStroke(currentConnectedSession || userId);
   }
 
@@ -323,13 +332,10 @@
   // Tools
   eraseBtn.addEventListener('click', ()=>{ colorInput.value = '#ffffff'; });
   undoBtn.addEventListener('click', async ()=>{
-    // local undo: remove last from localStrokes and request server NOT to remove (we can't remove easily arrayUnion items)
     localStrokes.pop();
-    // redraw local-only (we keep remote strokes from partner)
     redrawLocalAndRemote();
   });
   clearBtn.addEventListener('click', async ()=>{
-    // Clear local canvas and optionally clear own session strokes in firestore
     const ref = docRefForSession(currentConnectedSession || userId);
     await ref.set({strokes: []});
     remoteStrokesMap = {};
@@ -341,8 +347,6 @@
   });
 
   // ---------- Session connect logic ----------
-  let currentPartner = null;
-  let currentConnectedSession = null; // whichever session we're actively sharing with (our session + partner session)
   joinBtn.addEventListener('click', async ()=>{
     const pid = partnerInput.value.trim();
     if(!pid){ alert('Enter partner ID'); return; }
@@ -354,14 +358,13 @@
     // start listening to both
     startListen(userId, strokes => {
       remoteStrokesMap[userId] = strokes;
-      redrawLocalAndRemote();
+      // redrawLocalAndRemote(); // periodic render will update
     });
     startListen(currentPartner, strokes => {
       remoteStrokesMap[currentPartner] = strokes;
-      redrawLocalAndRemote();
     });
     connStatus.innerText = `Connected with ${currentPartner}`;
-    currentConnectedSession = userId; // when we draw, we post to our own session doc
+    currentConnectedSession = userId; // draws go to our session
   });
 
   // create new id quickly
@@ -369,6 +372,7 @@
     userId = generateId();
     localStorage.setItem('abhi_userid', userId);
     userIdEl.innerText = userId;
+    currentConnectedSession = userId;
     connStatus.innerText = 'New ID created';
   });
 
@@ -377,17 +381,9 @@
     await ensureSessionDoc(userId);
     startListen(userId, strokes => {
       remoteStrokesMap[userId] = strokes;
-      redrawLocalAndRemote();
     });
     connStatus.innerText = `Listening to ${userId}`;
   });
-
-  // When starting a stroke, we already push normalized points to localStrokes.
-  // But we must ensure when ending stroke we upload the normalized coordinates.
-  // (endStroke handles that)
-
-  // ---------- Firestore -> normalizing and drawing ----------
-  // remote strokes are stored as normalized (1000x600). drawStroke handles scaling.
 
   // ---------- WebRTC screen sharing (simple Firestore signaling) ----------
   let pc = null;
@@ -397,7 +393,6 @@
     if(!currentPartner){ alert('Connect to partner first'); return; }
     startShareBtn.disabled = true;
     stopShareBtn.disabled = false;
-    // getDisplayMedia
     try{
       localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
     }catch(err){
@@ -407,42 +402,29 @@
       return;
     }
 
-    // create RTCPeerConnection
-    pc = new RTCPeerConnection({
-      iceServers: [{urls:'stun:stun.l.google.com:19302'}]
-    });
-
-    // add tracks
+    pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
     localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-    // remote stream
     const remoteStream = new MediaStream();
     pc.ontrack = (evt) => {
       evt.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
       remoteVideo.srcObject = remoteStream;
     };
 
-    // create call doc for signaling under `calls/{callerId}_{calleeId}`
     const callId = `${userId}_${currentPartner}`;
     callDocRef = db.collection('calls').doc(callId);
     const offerCandidates = callDocRef.collection('offerCandidates');
     const answerCandidates = callDocRef.collection('answerCandidates');
 
-    // collect ICE candidates
     pc.onicecandidate = (event) => {
-      if(event.candidate){
-        offerCandidates.add(event.candidate.toJSON());
-      }
+      if(event.candidate) offerCandidates.add(event.candidate.toJSON());
     };
 
-    // create offer
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    // store offer in firestore
     await callDocRef.set({offer: {type: offer.type, sdp: offer.sdp}, caller: userId, callee: currentPartner});
 
-    // listen for answer
     callDocRef.onSnapshot(async snapshot => {
       const data = snapshot.data();
       if(!pc.currentRemoteDescription && data && data.answer){
@@ -451,7 +433,6 @@
       }
     });
 
-    // listen for remote ICE candidates (answerCandidates)
     answerCandidates.onSnapshot(snapshot => {
       snapshot.docChanges().forEach(async change => {
         if(change.type === 'added'){
@@ -461,18 +442,10 @@
       });
     });
 
-    // also listen if the callee created a reverse call (callee->caller)
-    // Not implemented complex; here we assume caller initiates and callee watches.
-
-    // Also, allow callee to subscribe to this call by checking call doc with id `${currentPartner}_${userId}`
     connStatus.innerText = 'Screen share started (offer created).';
-
-    // stop handling when local stream ends
     localStream.getVideoTracks()[0].onended = () => { stopScreenShare(); };
   });
 
-  // callee side: when someone wants to view your screen, they will read the call doc `${partner}_${yourId}` and respond
-  // We'll implement a watcher to automatically answer any incoming call where callee === userId
   (function watchIncomingCalls(){
     const callsCol = db.collection('calls');
     callsCol.where('callee','==', userId).onSnapshot(snapshot=>{
@@ -480,39 +453,31 @@
         if(change.type === 'added'){
           const doc = change.doc;
           const data = doc.data();
-          // only answer if this user is the callee
           if(!data || data.callee !== userId) return;
           const callId = doc.id;
-          // create RTCPeerConnection to receive stream
           const remoteCallRef = db.collection('calls').doc(callId);
           const offer = data.offer;
           const pc2 = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
           const answerCandidates = remoteCallRef.collection('answerCandidates');
           const offerCandidates = remoteCallRef.collection('offerCandidates');
 
-          // create remote stream
           const inboundStream = new MediaStream();
           pc2.ontrack = (evt)=> {
             evt.streams[0].getTracks().forEach(t => inboundStream.addTrack(t));
             remoteVideo.srcObject = inboundStream;
           };
 
-          // gather local ICE
           pc2.onicecandidate = (event) => {
             if(event.candidate){
               answerCandidates.add(event.candidate.toJSON());
             }
           };
 
-          // set remote description (offer)
           await pc2.setRemoteDescription(new RTCSessionDescription(offer));
-          // create answer
           const answer = await pc2.createAnswer();
           await pc2.setLocalDescription(answer);
-          // write answer to call doc
           await remoteCallRef.update({answer: {type: answer.type, sdp: answer.sdp}});
 
-          // listen for offer ICE candidates to add
           offerCandidates.onSnapshot(snapshot2=>{
             snapshot2.docChanges().forEach(async ch=>{
               if(ch.type === 'added'){
@@ -543,25 +508,18 @@
   }
   stopShareBtn.addEventListener('click', stopScreenShare);
 
-  // ---------- Simple periodic refresh to render local strokes and remote strokes ----------
-  // Because we store normalized coordinates in DB, remote strokes are rendered from remoteStrokesMap
-  // We'll also render localStrokes (the ones user drew during this session) on top.
+  // ---------- Rendering loop ----------
   function periodicRender(){
-    // clear
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    // draw remote sessions first
     Object.keys(remoteStrokesMap).forEach(sid=>{
       const list = remoteStrokesMap[sid]||[];
       list.forEach(st=>drawStroke(st));
     });
-    // draw local session strokes from Firestore as well if present
-    const myList = remoteStrokesMap[userId] || [];
-    myList.forEach(st=>drawStroke(st));
+    // draw any active local stroke (not yet uploaded)
+    if(currentStroke) drawStroke(currentStroke);
     requestAnimationFrame(periodicRender);
   }
   periodicRender();
-
-  // ---------- small helper: when remoteStrokesMap updates, we already redraw via animation frame ----------
 
   // Ensure we create session doc on load
   ensureSessionDoc(userId).catch(()=>{});
