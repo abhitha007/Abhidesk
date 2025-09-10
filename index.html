@@ -1,187 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Realtime Drawing Collaboration</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
-    #canvasContainer { position: relative; width: 100%; height: 80vh; }
-    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
-    #controls { margin: 10px; }
-    #userIdDisplay { font-weight: bold; color: blue; }
-    #status { margin-top: 5px; color: green; }
-    #joinButton { margin-left: 10px; }
-    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
-             left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
-    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
-    #modalClose { float: right; cursor: pointer; font-size: 20px;}
-  </style>
+  <meta charset="UTF-8">
+  <title>Realtime Drawing Collaboration</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
+    #canvasContainer { position: relative; width: 100%; height: 80vh; }
+    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
+    #controls { margin: 10px; }
+    #userIdDisplay { font-weight: bold; color: blue; }
+    #status { margin-top: 5px; color: green; }
+    #joinButton { margin-left: 10px; }
+    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
+             left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
+    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
+    #modalClose { float: right; cursor: pointer; font-size: 20px;}
+    #notificationContainer { margin-top: 10px; padding: 10px; border: 1px solid #ccc; display: none; }
+    #notificationMessage { font-weight: bold; }
+    #notificationButtons { margin-top: 5px; }
+  </style>
 </head>
 <body>
-  <h2>Realtime Drawing Board</h2>
-  <p>Your User ID: <span id="userIdDisplay">loading...</span></p>
+  <h2>Realtime Drawing Board</h2>
+  <p>Your User ID: <span id="userIdDisplay">loading...</span></p>
 
-  <div id="controls">
-    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
-    <button id="joinButton">Join Session</button>
-    <div id="status"></div>
-  </div>
+  <div id="controls">
+    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
+    <button id="joinButton">Request to Join</button>
+    <div id="status"></div>
+  </div>
 
-  <div id="canvasContainer">
-    <canvas id="canvas" width="800" height="600"></canvas>
-  </div>
+  <div id="notificationContainer">
+    <p id="notificationMessage"></p>
+    <div id="notificationButtons">
+      <button id="acceptButton">Accept</button>
+      <button id="declineButton">Decline</button>
+    </div>
+  </div>
 
-  <!-- Modal -->
-  <div id="modal">
-    <div id="modalContent">
-      <span id="modalClose">&times;</span>
-      <h3 id="modalTitle"></h3>
-      <p id="modalMessage"></p>
-    </div>
-  </div>
+  <div id="canvasContainer">
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
 
-  <!-- ✅ Firebase SDKs (CDN for GitHub Pages) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <div id="modal">
+    <div id="modalContent">
+      <span id="modalClose">&times;</span>
+      <h3 id="modalTitle"></h3>
+      <p id="modalMessage"></p>
+    </div>
+  </div>
 
-  <script>
-    // ✅ Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
-      authDomain: "abhidesk-d26d0.firebaseapp.com",
-      projectId: "abhidesk-d26d0",
-      storageBucket: "abhidesk-d26d0.appspot.com",
-      messagingSenderId: "924205685340",
-      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
-      measurementId: "G-ML9D0LTM0D"
-    };
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    // ✅ Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+      authDomain: "abhidesk-d26d0.firebaseapp.com",
+      projectId: "abhidesk-d26d0",
+      storageBucket: "abhidesk-d26d0.appspot.com",
+      messagingSenderId: "924205685340",
+      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+      measurementId: "G-ML9D0LTM0D"
+    };
 
-    // ✅ Generate User ID
-    let userId = Math.random().toString(36).substring(2, 8);
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("userIdDisplay").innerText = userId;
-    });
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    // Firestore helpers
-    function getSessionDocRef(sessionId) {
-      return db.collection("sessions").doc(sessionId);
-    }
+    // Generate User ID
+    let userId = Math.random().toString(36).substring(2, 8);
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("userIdDisplay").innerText = userId;
+      // Start listening for join requests
+      listenForJoinRequests();
+    });
 
-    async function ensureSession(uid) {
-      const docRef = getSessionDocRef(uid);
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        await docRef.set({ strokes: [] });
-      }
-    }
+    // Firestore refs
+    function getSessionDocRef(sessionId) {
+      return db.collection("sessions").doc(sessionId);
+    }
+    function getNotificationDocRef(targetId) {
+      return db.collection("notifications").doc(targetId);
+    }
 
-    // Create session for self
-    ensureSession(userId);
+    // Current state
+    let currentSessionId = userId;
+    let unsubscribeSession = () => {};
+    let unsubscribeNotifications = () => {};
 
-    // Canvas setup
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#000';
+    // Canvas setup
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000';
+    let drawing = false;
+    let currentStroke = { color: ctx.strokeStyle, points: [] };
+    let lastX, lastY;
 
-    let drawing = false;
-    let currentStroke = { color: ctx.strokeStyle, points: [] };
-    let lastX, lastY;
+    // Event listeners for drawing
+    canvas.addEventListener('mousedown', (e) => {
+      drawing = true;
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
+    });
 
-    function draw(x, y) {
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      lastX = x;
-      lastY = y;
-      currentStroke.points.push({ x, y });
-    }
+    canvas.addEventListener('mousemove', (e) => {
+      if (!drawing) return;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      currentStroke.points.push({ x: e.offsetX, y: e.offsetY });
+    });
 
-    canvas.addEventListener('mousedown', (e) => {
-      drawing = true;
-      lastX = e.offsetX;
-      lastY = e.offsetY;
-      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
-    });
+    canvas.addEventListener('mouseup', async () => {
+      drawing = false;
+      if (currentStroke.points.length > 0) {
+        const docRef = getSessionDocRef(currentSessionId);
+        await docRef.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) })
+          .catch(async () => {
+            await docRef.set({ strokes: [currentStroke] });
+          });
+        currentStroke = { color: ctx.strokeStyle, points: [] };
+      }
+    });
 
-    canvas.addEventListener('mousemove', (e) => {
-      if (!drawing) return;
-      draw(e.offsetX, e.offsetY);
-    });
+    // Render strokes
+    function renderStrokes(strokes) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      strokes.forEach(stroke => {
+        if (stroke.points && stroke.points.length > 1) {
+          ctx.beginPath();
+          ctx.strokeStyle = stroke.color || '#000';
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
+          ctx.stroke();
+        }
+      });
+    }
 
-    canvas.addEventListener('mouseup', async () => {
-      drawing = false;
-      if (currentStroke.points.length > 0) {
-        const docRef = getSessionDocRef(userId);
-        await docRef.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) })
-          .catch(async () => {
-            await docRef.set({ strokes: [currentStroke] });
-          });
-        currentStroke = { color: ctx.strokeStyle, points: [] };
-      }
-    });
+    // Session listener
+    function startSession(sessionId) {
+      unsubscribeSession();
+      currentSessionId = sessionId;
+      const docRef = getSessionDocRef(sessionId);
+      unsubscribeSession = docRef.onSnapshot((docSnap) => {
+        if (docSnap.exists) {
+          renderStrokes(docSnap.data().strokes || []);
+        }
+      });
+      document.getElementById('status').innerText = `Drawing in shared session: ${sessionId}`;
+    }
 
-    // Render strokes
-    function renderStrokes(strokes) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      strokes.forEach(stroke => {
-        if (stroke.points && stroke.points.length > 1) {
-          ctx.beginPath();
-          ctx.strokeStyle = stroke.color || '#000';
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
-          ctx.stroke();
-        }
-      });
-    }
+    // Initial session for the current user
+    startSession(userId);
 
-    // Session listener
-    let unsubscribe = () => {};
-    function startListening(sessionId) {
-      if (unsubscribe) unsubscribe();
-      const docRef = getSessionDocRef(sessionId);
-      unsubscribe = docRef.onSnapshot((docSnap) => {
-        if (docSnap.exists) {
-          renderStrokes(docSnap.data().strokes || []);
-        }
-      });
-      document.getElementById('status').innerText = `Joined session with User ID: ${sessionId}`;
-    }
+    // Notification system
+    async function listenForJoinRequests() {
+      unsubscribeNotifications();
+      const docRef = getNotificationDocRef(userId);
+      unsubscribeNotifications = docRef.onSnapshot((docSnap) => {
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          if (data.status === 'pending') {
+            showNotification(data.fromId);
+          }
+        }
+      });
+    }
 
-    // Join partner session
-    document.getElementById('joinButton').addEventListener('click', async () => {
-    const targetIdInput = document.getElementById('targetIdInput').value.trim();
-    if (!targetIdInput || targetIdInput === userId) {
-      showModal("Invalid", "Enter a different User ID.");
-      return;
-    }
+    function showNotification(fromId) {
+      const container = document.getElementById('notificationContainer');
+      const message = document.getElementById('notificationMessage');
+      message.innerText = `Join request from User ID: ${fromId}`;
+      container.style.display = 'block';
 
-    // 👇 Listen to both my session & partner session
-    startListening(userId);
-    startListening(targetIdInput);
+      document.getElementById('acceptButton').onclick = async () => {
+        await acceptJoinRequest(fromId);
+        container.style.display = 'none';
+      };
+      document.getElementById('declineButton').onclick = async () => {
+        await declineJoinRequest(fromId);
+        container.style.display = 'none';
+      };
+    }
 
-    document.getElementById('status').innerText =
-      `Now sharing between ${userId} and ${targetIdInput}`;
-  });
+    async function acceptJoinRequest(fromId) {
+      // Use the requesting user's ID as the shared session ID
+      startSession(fromId);
+      // Notify the other user of the acceptance
+      await getNotificationDocRef(fromId).set({
+        status: 'accepted',
+        sessionId: fromId
+      });
+    }
+
+    async function declineJoinRequest(fromId) {
+      // Notify the other user of the decline
+      await getNotificationDocRef(fromId).set({
+        status: 'declined'
+      });
+    }
+
+    // Join partner session
+    document.getElementById('joinButton').addEventListener('click', async () => {
+      const targetId = document.getElementById('targetIdInput').value.trim();
+      if (!targetId || targetId === userId) {
+        showModal("Invalid", "Enter a different User ID.");
+        return;
+      }
+
+      // Send join request
+      await getNotificationDocRef(targetId).set({
+        fromId: userId,
+        status: 'pending'
+      });
+      document.getElementById('status').innerText = `Sent join request to ${targetId}. Waiting for acceptance...`;
+
+      // Listen for the response to my request
+      unsubscribeNotifications();
+      const myNotificationRef = getNotificationDocRef(userId);
+      unsubscribeNotifications = myNotificationRef.onSnapshot((docSnap) => {
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          if (data.status === 'accepted' && data.sessionId) {
+            showModal("Success!", "Your request was accepted. Now joining the session.");
+            startSession(data.sessionId);
+            myNotificationRef.delete(); // Clean up
+          } else if (data.status === 'declined') {
+            showModal("Request Declined", "Your join request was declined.");
+            myNotificationRef.delete(); // Clean up
+          }
+        }
+      });
+    });
 
 
-    // Modal
-    const modal = document.getElementById("modal");
-    const modalClose = document.getElementById("modalClose");
-    function showModal(title, message) {
-      document.getElementById("modalTitle").innerText = title;
-      document.getElementById("modalMessage").innerText = message;
-      modal.style.display = "block";
-    }
-    modalClose.onclick = () => { modal.style.display = "none"; };
-    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
-  </script>
+    // Modal
+    const modal = document.getElementById("modal");
+    const modalClose = document.getElementById("modalClose");
+    function showModal(title, message) {
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalMessage").innerText = message;
+      modal.style.display = "block";
+    }
+    modalClose.onclick = () => { modal.style.display = "none"; };
+    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+  </script>
 </body>
 </html>
