@@ -1,304 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎨 Pro Collaborative Canvas</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        canvas {
-            touch-action: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎨 Realtime Collaborative Canvas</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f9f9f9;
+    }
+
+    h1 {
+      margin: 20px 0;
+      color: #007BFF;
+    }
+
+    #canvasContainer {
+      width: 95%;
+      height: 80vh;
+      border: 2px solid #007BFF;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+<body>
+  <h1>Realtime Collaborative Canvas</h1>
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
 
-    <div class="header w-full text-center py-4 border-b border-gray-300">
-        <h1 class="text-4xl font-bold text-blue-600">Pro Collaborative Canvas</h1>
-    </div>
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <div class="controls-container flex flex-col md:flex-row flex-wrap justify-center gap-4 my-6 p-6 bg-white rounded-xl shadow-lg w-full max-w-4xl">
-        <div class="room-controls flex items-center gap-2 flex-wrap justify-center">
-            <input type="text" id="sessionIdInput" placeholder="Enter room ID or create one" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
-            <button id="joinButton" class="btn bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-all duration-200">Join Room</button>
-            <button id="leaveButton" class="btn bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all duration-200 hidden">Leave Room</button>
-        </div>
-        <div class="tool-controls flex items-center gap-2 flex-wrap justify-center">
-            <input type="color" id="colorPicker" value="#000000" class="w-12 h-12 p-1 border-2 border-gray-300 rounded-full cursor-pointer transition-all duration-200">
-            <input type="range" id="brushSize" min="2" max="20" value="5" class="w-28 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
-            <button id="eraserButton" class="btn bg-gray-200 text-gray-800 font-semibold py-3 px-6 rounded-lg hover:bg-gray-300 transition-all duration-200">Eraser</button>
-            <button id="clearButton" class="btn bg-red-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-600 transition-all duration-200">Clear All</button>
-        </div>
-    </div>
-    
-    <div class="status-bar w-full text-center py-2 text-sm text-gray-600">
-        <p>Current Room: <span id="currentRoomDisplay" class="font-semibold text-blue-600">Not joined</span> | Your ID: <span id="userIdDisplay" class="font-semibold text-blue-600">Loading...</span></p>
-    </div>
+  <script>
+    // ✅ Firebase config (fixed storageBucket)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+      authDomain: "abhidesk-d26d0.firebaseapp.com",
+      projectId: "abhidesk-d26d0",
+      storageBucket: "abhidesk-d26d0.appspot.com",
+      messagingSenderId: "924205685340",
+      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+      measurementId: "G-ML9D0LTM0D"
+    };
 
-    <div id="canvasContainer" class="w-full max-w-6xl aspect-video bg-white rounded-xl shadow-2xl border border-gray-300 relative overflow-hidden mt-4 mb-8">
-        <canvas id="canvas" class="w-full h-full"></canvas>
-    </div>
+    // ✅ Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, getDoc, setDoc, writeBatch, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    // ✅ Canvas setup
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
 
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
-            authDomain: "abhidesk-d26d0.firebaseapp.com",
-            projectId: "abhidesk-d26d0",
-            storageBucket: "abhidesk-d26d0.appspot.com",
-            messagingSenderId: "924205685340",
-            appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
-            measurementId: "G-ML9D0LTM0D"
-        };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    let drawing = false;
+    let sessionId = "test-room"; // Default room
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+    canvas.addEventListener("mousedown", () => drawing = true);
+    canvas.addEventListener("mouseup", () => drawing = false);
+    canvas.addEventListener("mousemove", draw);
 
-        // UI Elements
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const userIdDisplay = document.getElementById('userIdDisplay');
-        const currentRoomDisplay = document.getElementById('currentRoomDisplay');
-        const sessionIdInput = document.getElementById('sessionIdInput');
-        const joinButton = document.getElementById('joinButton');
-        const leaveButton = document.getElementById('leaveButton');
-        const colorPicker = document.getElementById('colorPicker');
-        const brushSizeSlider = document.getElementById('brushSize');
-        const eraserButton = document.getElementById('eraserButton');
-        const clearButton = document.getElementById('clearButton');
+    function draw(e) {
+      if (!drawing) return;
+      const x = e.offsetX;
+      const y = e.offsetY;
+      ctx.fillRect(x, y, 2, 2);
 
-        // Global state
-        let userId = '';
-        let currentSessionId = null;
-        let drawing = false;
-        let lastPosition = { x: 0, y: 0 };
-        let unsubscribe = null;
-        let allStrokes = [];
+      // Save to Firestore
+      db.collection("sessions").doc(sessionId).collection("strokes").add({
+        x, y,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
 
-        // Authentication
-        async function authenticate() {
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase Auth Error:", error);
-            }
-        }
-
-        // Wait for authentication state to be ready
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                userId = user.uid;
-                userIdDisplay.innerText = userId;
-            } else {
-                userIdDisplay.innerText = 'Not authenticated';
-                authenticate(); // Try to sign in anonymously if not already authenticated
-            }
+    // ✅ Realtime listener
+    db.collection("sessions").doc(sessionId).collection("strokes")
+      .orderBy("timestamp")
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === "added") {
+            const { x, y } = change.doc.data();
+            ctx.fillRect(x, y, 2, 2);
+          }
         });
-
-        // Drawing context settings
-        ctx.lineWidth = brushSizeSlider.value;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = colorPicker.value;
-
-        // Resize canvas to fit container
-        function resizeCanvas() {
-            const container = document.getElementById('canvasContainer');
-            canvas.width = container.offsetWidth;
-            canvas.height = container.offsetHeight;
-            if (currentSessionId) {
-                renderStrokesFromCache();
-            }
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        // Helper to get mouse/touch position
-        function getPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : null);
-            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : null);
-            if (clientX === null || clientY === null) return null;
-            return {
-                x: clientX - rect.left,
-                y: clientY - rect.top
-            };
-        }
-
-        // Drawing logic
-        canvas.addEventListener('mousedown', (e) => {
-            drawing = true;
-            lastPosition = getPos(e);
-        });
-        canvas.addEventListener('touchstart', (e) => {
-            drawing = true;
-            lastPosition = getPos(e);
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!drawing || !currentSessionId) return;
-            const newPosition = getPos(e);
-            if (!newPosition) return;
-
-            const stroke = {
-                startX: lastPosition.x,
-                startY: lastPosition.y,
-                endX: newPosition.x,
-                endY: newPosition.y,
-                color: ctx.strokeStyle,
-                lineWidth: ctx.lineWidth,
-                timestamp: Date.now()
-            };
-            addDoc(collection(db, `artifacts/${appId}/public/data/sessions/${currentSessionId}/strokes`), stroke);
-            
-            lastPosition = newPosition;
-        });
-
-        canvas.addEventListener('touchmove', (e) => {
-            if (!drawing || !currentSessionId) return;
-            e.preventDefault();
-            const newPosition = getPos(e);
-            if (!newPosition) return;
-
-            const stroke = {
-                startX: lastPosition.x,
-                startY: lastPosition.y,
-                endX: newPosition.x,
-                endY: newPosition.y,
-                color: ctx.strokeStyle,
-                lineWidth: ctx.lineWidth,
-                timestamp: Date.now()
-            };
-            addDoc(collection(db, `artifacts/${appId}/public/data/sessions/${currentSessionId}/strokes`), stroke);
-            
-            lastPosition = newPosition;
-        }, { passive: false });
-
-        window.addEventListener('mouseup', () => { drawing = false; });
-        window.addEventListener('touchend', () => { drawing = false; });
-
-        // Render all strokes from the local cache
-        function renderStrokesFromCache() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            allStrokes.forEach(stroke => {
-                ctx.beginPath();
-                ctx.strokeStyle = stroke.color;
-                ctx.lineWidth = stroke.lineWidth;
-                ctx.moveTo(stroke.startX, stroke.startY);
-                ctx.lineTo(stroke.endX, stroke.endY);
-                ctx.stroke();
-            });
-        }
-
-        // Firebase Session Management
-        async function joinSession(sessionId) {
-            if (unsubscribe) unsubscribe();
-            currentSessionId = sessionId;
-            allStrokes = []; // Clear the local cache for the new session
-            renderStrokesFromCache(); // Clear the canvas
-
-            const sessionRef = doc(db, `artifacts/${appId}/public/data/sessions`, sessionId);
-            const sessionDoc = await getDoc(sessionRef);
-            if (!sessionDoc.exists()) {
-                await setDoc(sessionRef, { created: Date.now() });
-            }
-
-            // Set up a real-time listener for all changes
-            unsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/sessions/${currentSessionId}/strokes`), orderBy("timestamp")), (snapshot) => {
-                snapshot.docChanges().forEach(change => {
-                    const strokeData = change.doc.data();
-                    if (change.type === "added") {
-                        allStrokes.push(strokeData);
-                    } else if (change.type === "removed") {
-                        // Use a simple timestamp match to filter
-                        allStrokes = allStrokes.filter(s => s.timestamp !== strokeData.timestamp);
-                    }
-                });
-                renderStrokesFromCache();
-            }, error => {
-                console.error("Error listening for strokes:", error);
-                alert("Error joining session. Please check your network and try again.");
-                leaveSession();
-            });
-
-            currentRoomDisplay.innerText = sessionId;
-            sessionIdInput.disabled = true;
-            joinButton.classList.add('hidden');
-            leaveButton.classList.remove('hidden');
-        }
-
-        function leaveSession() {
-            if (unsubscribe) unsubscribe();
-            currentSessionId = null;
-            allStrokes = [];
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            currentRoomDisplay.innerText = 'Not joined';
-            sessionIdInput.disabled = false;
-            sessionIdInput.value = '';
-            joinButton.classList.remove('hidden');
-            leaveButton.classList.add('hidden');
-        }
-
-        // Event Listeners for UI
-        joinButton.addEventListener('click', () => {
-            const sessionId = sessionIdInput.value.trim();
-            if (sessionId) {
-                joinSession(sessionId);
-            } else {
-                alert("Please enter a room ID.");
-            }
-        });
-
-        leaveButton.addEventListener('click', leaveSession);
-
-        colorPicker.addEventListener('change', (e) => {
-            ctx.strokeStyle = e.target.value;
-        });
-
-        brushSizeSlider.addEventListener('input', (e) => {
-            ctx.lineWidth = e.target.value;
-        });
-
-        eraserButton.addEventListener('click', () => {
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 20;
-        });
-
-        clearButton.addEventListener('click', async () => {
-            if (!currentSessionId) {
-                alert("Please join a room first.");
-                return;
-            }
-            if (!confirm('Are you sure you want to clear the entire canvas for everyone?')) return;
-
-            const batch = writeBatch(db);
-            const q = query(collection(db, `artifacts/${appId}/public/data/sessions/${currentSessionId}/strokes`));
-            const snapshot = await getDocs(q);
-
-            snapshot.forEach((doc) => {
-                batch.delete(doc.ref);
-            });
-
-            await batch.commit();
-        });
-
-    </script>
+      });
+  </script>
 </body>
 </html>
