@@ -70,6 +70,7 @@
       document.getElementById("userIdDisplay").innerText = userId;
       ensureSession(userId);
       listenForJoinRequests();
+      startSession([userId]);
     });
 
     // Firestore helpers
@@ -137,23 +138,40 @@
       });
     }
 
-    // Session listener
+    // Session logic to handle multiple listeners
     let sessionUnsubscribers = [];
-    function startListening(sessionIds) {
+    let sessionData = {}; // New data store to hold strokes from all sessions
+
+    function startSession(sessionIds) {
+      // Clear previous listeners and data
       sessionUnsubscribers.forEach(unsub => unsub());
       sessionUnsubscribers = [];
+      sessionData = {};
+
       const statusElement = document.getElementById('status');
       
       sessionIds.forEach(id => {
         const docRef = getSessionDocRef(id);
+        
         const unsub = docRef.onSnapshot((docSnap) => {
           if (docSnap.exists) {
-            const allStrokes = sessionIds.flatMap(sId => {
-              const snap = sId === id ? docSnap : null;
-              return snap ? snap.data().strokes || [] : [];
-            });
+            // Update the shared data store with the latest strokes from this session
+            sessionData[id] = docSnap.data().strokes || [];
+            
+            // Combine all strokes from the shared data store
+            const allStrokes = Object.values(sessionData).flat();
+            
+            // Render the combined strokes
             renderStrokes(allStrokes);
-            statusElement.innerText = `Joined sessions with: ${sessionIds.join(', ')}`;
+            
+            // Update status message
+            statusElement.innerText = `Joined sessions with: ${Object.keys(sessionData).join(', ')}`;
+          } else {
+             // If a session document is deleted, remove it from our data store
+             delete sessionData[id];
+             const allStrokes = Object.values(sessionData).flat();
+             renderStrokes(allStrokes);
+             statusElement.innerText = `Joined sessions with: ${Object.keys(sessionData).join(', ')}`;
           }
         });
         sessionUnsubscribers.push(unsub);
@@ -196,7 +214,7 @@
           const data = doc.data();
           if (data.status === 'accepted') {
             showModal("Request Accepted!", `${targetId} has accepted your request. Starting collaborative session.`);
-            startListening([userId, targetId]);
+            startSession([userId, targetId]);
             requestRef.delete().catch(e => console.log("Failed to delete request doc:", e));
           } else if (data.status === 'rejected') {
             showModal("Request Rejected", `${targetId} has rejected your request.`);
@@ -221,7 +239,7 @@
             acceptBtn.onclick = async () => {
               await db.collection("join_requests").doc(requestId).update({ status: 'accepted' });
               showModal("Success!", `You've accepted ${requesterId}'s request. Collaboration started.`);
-              startListening([userId, requesterId]);
+              startSession([userId, requesterId]);
             };
             rejectBtn.onclick = async () => {
               await db.collection("join_requests").doc(requestId).delete();
@@ -231,9 +249,6 @@
         });
       });
     }
-
-    // Initially start listening to only your own session
-    startListening([userId]);
-  </script>
+</script>
 </body>
 </html>
