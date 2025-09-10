@@ -1,13 +1,14 @@
 // Firebase configuration
-const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID",
-            measurementId: "YOUR_MEASUREMENT_ID"
-        };
+  const firebaseConfig = {
+    apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+    authDomain: "abhidesk-d26d0.firebaseapp.com",
+    projectId: "abhidesk-d26d0",
+    storageBucket: "abhidesk-d26d0.appspot.com",
+    messagingSenderId: "924205685340",
+    appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+    measurementId: "G-ML9D0LTM0D"
+
+    };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
