@@ -5,32 +5,13 @@
 <title>AbhiDesk — Realtime Drawing + Screen Share</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-:root{
-  --bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)
-}
-*{box-sizing:border-box} 
-body{
-  margin:0;font-family:Inter,Arial,sans-serif;
-  background:linear-gradient(180deg,#071124,#081728);
-  color:#e6eef6;overflow-x:hidden
-}
-.app{
-  max-width:1100px;margin:24px auto;padding:18px;
-  border-radius:12px;
-  background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
-  box-shadow:0 8px 30px rgba(2,6,23,0.6);
-  transition:all 0.3s ease
-}
+:root{--bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#071124,#081728);color:#e6eef6;overflow-x:hidden}
+.app{max-width:1100px;margin:24px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.6);transition:all 0.3s ease}
 header{display:flex;justify-content:space-between;align-items:center}
-.user-pill{
-  background:var(--glass);padding:8px 12px;border-radius:999px;color:var(--accent);font-weight:600;transition:0.3s
-}
-.user-pill.connected{
-  box-shadow:0 0 12px var(--accent);animation:glow 1.5s infinite alternate
-}
-@keyframes glow{
-  0%{box-shadow:0 0 0 var(--accent)}100%{box-shadow:0 0 12px var(--accent)}
-}
+.user-pill{background:var(--glass);padding:8px 12px;border-radius:999px;color:var(--accent);font-weight:600;transition:0.3s}
+.user-pill.connected{box-shadow:0 0 12px var(--accent);animation:glow 1.5s infinite alternate}
+@keyframes glow{0%{box-shadow:0 0 0 var(--accent)}100%{box-shadow:0 0 12px var(--accent)}}
 .controls{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap}
 input[type=text]{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;min-width:220px;transition:0.2s}
 input[type=text]:focus{border-color:var(--accent);outline:none}
@@ -58,7 +39,7 @@ video{width:100%;border-radius:8px;background:#000}
 <div class="controls">
   <div style="display:flex;gap:8px;align-items:center">
     <input id="partnerId" type="text" placeholder="Partner User ID (paste here)">
-    <button id="joinBtn">Send Invite</button>
+    <button id="joinBtn">Connect</button>
     <button id="createBtn" class="ghost">New ID</button>
   </div>
   <div style="margin-left:auto"><div id="connStatus" class="status">Not connected</div></div>
@@ -107,219 +88,149 @@ video{width:100%;border-radius:8px;background:#000}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
 <script>
-// --------------- CONFIG ---------------
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
   projectId: "abhidesk-d26d0",
   storageBucket: "abhidesk-d26d0.appspot.com",
   messagingSenderId: "924205685340",
-  appId: "1:924205685340:web:b33b4dfa2be1da2696a499"
+  appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+  measurementId: "G-ML9D0LTM0D"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// --------------- STATE & UI ---------------
-const userIdEl = document.getElementById('userId');
+// ----------------- USER & SESSION -----------------
 let userId = localStorage.getItem('abhi_userid') || Math.random().toString(36).substring(2,9);
 localStorage.setItem('abhi_userid', userId);
-userIdEl.innerText = userId;
+document.getElementById('userId').innerText = userId;
 
-const partnerInput = document.getElementById('partnerId');
-const joinBtn = document.getElementById('joinBtn');
-const createBtn = document.getElementById('createBtn');
-const connStatus = document.getElementById('connStatus');
+let partnerAccepted=false, currentPartner=null;
+let localStrokes=[], currentStroke=null, drawing=false, lastX=0, lastY=0;
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const colorInput = document.getElementById('color');
-const widthInput = document.getElementById('width');
-const eraseBtn = document.getElementById('eraseBtn');
-const undoBtn = document.getElementById('undoBtn');
-const clearBtn = document.getElementById('clearBtn');
-const exportBtn = document.getElementById('exportBtn');
+// ----------------- CANVAS -----------------
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+function fitCanvas(){ const w=Math.min(1000,Math.max(320,window.innerWidth-260)); canvas.width=w; canvas.height=Math.round(w*0.6);}
+window.addEventListener('resize', fitCanvas); fitCanvas();
 
-const startShareBtn = document.getElementById('startShare');
-const stopShareBtn = document.getElementById('stopShare');
-const remoteVideo = document.getElementById('remoteVideo');
+// ----------------- HELPERS -----------------
+async function ensureSession(id){ const ref=db.collection('sessions').doc(id); if(!(await ref.get()).exists) await ref.set({strokes:[],requests:{}}); return ref; }
 
-let remoteStrokesMap = {};
-let localStrokes = [];
-let currentStroke = null;
-let drawing=false,lastX=0,lastY=0;
-let currentPartner=null;
-let partnerAccepted=false;
-let pc=null, localStream=null, callDocRef=null;
+// ----------------- INVITATIONS -----------------
+async function sendInvite(pid){
+  if(!pid || pid===userId){ alert('Enter valid ID'); return; }
+  currentPartner=pid;
+  const ref = await ensureSession(pid);
+  const reqId = Date.now()+'_'+userId;
+  await ref.update({[`requests.${reqId}`]:{from:userId,status:'pending'}});
+  document.getElementById('connStatus').innerText=`Invitation sent to ${pid}`;
 
-// --------------- CANVAS FIT ---------------
-function fitCanvas(){
-  const w = Math.min(1000, Math.max(320, window.innerWidth - 260));
-  canvas.width=w;
-  canvas.height=Math.round(w*0.6);
-}
-window.addEventListener('resize', fitCanvas);
-fitCanvas();
-
-// --------------- FIRESTORE HELPERS ---------------
-function sessionDoc(id){ return db.collection('sessions').doc(id);}
-async function ensureSession(id){
-  const ref = sessionDoc(id);
-  if(!(await ref.get()).exists) await ref.set({strokes: [], requests:{}});
-  return ref;
+  ref.onSnapshot(snap=>{
+    const data = snap.data();
+    if(data.requests && data.requests[reqId]){
+      const r = data.requests[reqId];
+      if(r.status==='accepted'){
+        partnerAccepted=true;
+        document.getElementById('connStatus').innerText=`Connected with ${pid}`;
+        document.getElementById('userId').classList.add('connected');
+        startShareBtn.disabled=false;
+        listenPartnerStrokes(pid);
+      } else if(r.status==='declined'){
+        partnerAccepted=false;
+        document.getElementById('connStatus').innerText=`${pid} declined`;
+      }
+    }
+  });
 }
 
-// --------------- INVITATIONS & CONNECTIONS ---------------
-function notifyRequest(reqId, fromId){
+async function listenIncomingInvites(){
+  const ref = await ensureSession(userId);
+  ref.onSnapshot(snap=>{
+    const data = snap.data();
+    if(!data.requests) return;
+    Object.keys(data.requests).forEach(reqId=>{
+      const req=data.requests[reqId];
+      if(req.status==='pending' && req.from!==userId){
+        showNotification(reqId, req.from);
+      }
+    });
+  });
+}
+
+function showNotification(reqId, fromId){
   if(!('Notification' in window)) return;
   if(Notification.permission!=='granted') Notification.requestPermission();
-  const n = new Notification('AbhiDesk Invite', {body:`${fromId} wants to connect.`, requireInteraction:true});
-  n.onclick = ()=>{ acceptRequest(reqId); n.close(); };
+  const n=new Notification('AbhiDesk Invite',{body:`${fromId} wants to connect. Click to accept.`, requireInteraction:true});
+  n.onclick=()=>{ acceptRequest(reqId); n.close(); };
 }
 
 async function acceptRequest(reqId){
-  const ref = sessionDoc(userId);
-  const data = (await ref.get()).data();
+  const ref=await ensureSession(userId);
+  const data=(await ref.get()).data();
   if(!data.requests[reqId]) return;
   data.requests[reqId].status='accepted';
   await ref.update({requests:data.requests});
-  currentPartner = data.requests[reqId].from;
-  partnerAccepted = true;
-  userIdEl.classList.add('connected');
-  connStatus.innerText = `Connected with ${currentPartner}`;
+  currentPartner=data.requests[reqId].from;
+  partnerAccepted=true;
+  document.getElementById('connStatus').innerText=`Connected with ${currentPartner}`;
+  document.getElementById('userId').classList.add('connected');
   startShareBtn.disabled=false;
   listenPartnerStrokes(currentPartner);
 }
 
 async function declineRequest(reqId){
-  const ref = sessionDoc(userId);
-  const data = (await ref.get()).data();
+  const ref=await ensureSession(userId);
+  const data=(await ref.get()).data();
   if(!data.requests[reqId]) return;
   data.requests[reqId].status='declined';
   await ref.update({requests:data.requests});
 }
 
-// --------------- SEND INVITE ---------------
-joinBtn.addEventListener('click', async ()=>{
-  const pid = partnerInput.value.trim();
-  if(!pid || pid===userId){ alert('Enter valid partner ID'); return;}
-  currentPartner=pid;
-  const partnerRef = await ensureSession(currentPartner);
-  const reqId = Date.now()+'_'+userId;
-  await partnerRef.update({[`requests.${reqId}`]: {from:userId, status:'pending'}});
-  connStatus.innerText=`Invitation sent to ${currentPartner}`;
-
-  partnerRef.onSnapshot(docSnap=>{
-    const data = docSnap.data();
-    if(data.requests && data.requests[reqId]){
-      const r = data.requests[reqId];
-      if(r.status==='accepted'){
-        partnerAccepted=true;
-        connStatus.innerText=`Partner ${currentPartner} accepted`;
-        userIdEl.classList.add('connected');
-        startShareBtn.disabled=false;
-        listenPartnerStrokes(currentPartner);
-      } else if(r.status==='declined'){
-        connStatus.innerText=`Partner ${currentPartner} declined`;
-      }
-    }
-  });
-});
-
-// --------------- DRAWING LOGIC ---------------
-function norm(x,y){return {x: Math.round((x/canvas.width)*1000), y: Math.round((y/canvas.height)*600)};}
+// ----------------- DRAWING -----------------
+function toNormalized(x,y){ return {x:Math.round((x/canvas.width)*1000),y:Math.round((y/canvas.height)*600)};}
 function beginStroke(x,y){currentStroke={color:colorInput.value,width:parseInt(widthInput.value),points:[{x,y}]}; localStrokes.push(currentStroke);}
 function pushPoint(x,y){if(!currentStroke) return; currentStroke.points.push({x,y});}
 async function endStroke(sessionId){
-  if(!currentStroke || !partnerAccepted) {currentStroke=null; return;}
-  try{await sessionDoc(sessionId).update({strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke)});}catch(e){console.error(e);}
+  if(!currentStroke||!partnerAccepted){ currentStroke=null; return; }
+  const payload={...currentStroke};
+  try{ await db.collection('sessions').doc(sessionId).update({strokes:firebase.firestore.FieldValue.arrayUnion(payload)});} catch(e){console.error(e);}
   currentStroke=null;
 }
-function drawStroke(s){
-  if(!s||!s.points?.length) return;
-  ctx.save(); ctx.lineWidth=s.width||2; ctx.strokeStyle=s.color||'#000'; ctx.beginPath();
-  ctx.moveTo(s.points[0].x*(canvas.width/1000), s.points[0].y*(canvas.height/600));
-  s.points.slice(1).forEach(p=>ctx.lineTo(p.x*(canvas.width/1000), p.y*(canvas.height/600)));
-  ctx.stroke(); ctx.restore();
-}
+function drawStroke(st){ if(!st||!st.points||st.points.length===0) return; ctx.save(); ctx.lineWidth=st.width||2; ctx.strokeStyle=st.color||'#000'; ctx.beginPath(); ctx.moveTo(st.points[0].x*(canvas.width/1000),st.points[0].y*(canvas.height/600)); st.points.slice(1).forEach(p=>ctx.lineTo(p.x*(canvas.width/1000),p.y*(canvas.height/600))); ctx.stroke(); ctx.restore(); }
 
-canvas.addEventListener('mousedown', e=>{
-  if(!partnerAccepted) return;
-  drawing=true;
-  const rect=canvas.getBoundingClientRect();
-  const {x,y}=norm(e.clientX-rect.left, e.clientY-rect.top);
-  beginStroke(x,y);
-  lastX=e.clientX-rect.left; lastY=e.clientY-rect.top;
-});
-canvas.addEventListener('mousemove', e=>{
-  if(!drawing||!partnerAccepted) return;
-  const rect=canvas.getBoundingClientRect();
-  const {x,y}=norm(e.clientX-rect.left, e.clientY-rect.top);
-  pushPoint(x,y);
-  ctx.save(); ctx.lineWidth=parseInt(widthInput.value); ctx.strokeStyle=colorInput.value;
-  ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(e.clientX-rect.left,e.clientY-rect.top); ctx.stroke(); ctx.restore();
-  lastX=e.clientX-rect.left; lastY=e.clientY-rect.top;
-});
-canvas.addEventListener('mouseup', async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
-canvas.addEventListener('mouseleave', async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
+canvas.addEventListener('mousedown',e=>{if(!partnerAccepted)return; drawing=true; const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; beginStroke(toNormalized(x,y).x,toNormalized(x,y).y); lastX=x; lastY=y;});
+canvas.addEventListener('mousemove',e=>{if(!drawing||!partnerAccepted) return; const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; pushPoint(toNormalized(x,y).x,toNormalized(x,y).y); ctx.save(); ctx.lineWidth=parseInt(widthInput.value); ctx.strokeStyle=colorInput.value; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); ctx.restore(); lastX=x; lastY=y;});
+canvas.addEventListener('mouseup',async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
+canvas.addEventListener('mouseleave',async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
 
-// --------------- TOOLS ---------------
-eraseBtn.addEventListener('click', ()=>{ colorInput.value='#ffffff'; });
-undoBtn.addEventListener('click', ()=>{ localStrokes.pop(); });
-clearBtn.addEventListener('click', async ()=>{ await sessionDoc(currentPartner||userId).set({strokes:[]}); remoteStrokesMap={}; });
-exportBtn.addEventListener('click', ()=>{ const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`board_${Date.now()}.png`; a.click(); });
-
-// --------------- RENDER LOOP ---------------
-function render(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  Object.values(remoteStrokesMap).forEach(sts=>sts.forEach(drawStroke));
-  localStrokes.forEach(drawStroke);
-  requestAnimationFrame(render);
-}
-render();
-
-// --------------- PARTNER STROKES LISTENER ---------------
+// ----------------- RENDER LOOP -----------------
+let remoteStrokesMap={};
 function listenPartnerStrokes(pid){
-  sessionDoc(pid).onSnapshot(docSnap=>{
-    if(!docSnap.exists) return;
-    remoteStrokesMap[pid]=docSnap.data().strokes||[];
-  });
+  const ref=db.collection('sessions').doc(pid);
+  ref.onSnapshot(snap=>{ remoteStrokesMap[pid]=snap.data()?.strokes||[]; });
 }
+function renderLoop(){ ctx.clearRect(0,0,canvas.width,canvas.height); Object.values(remoteStrokesMap).forEach(arr=>arr.forEach(drawStroke)); localStrokes.forEach(drawStroke); requestAnimationFrame(renderLoop);}
+renderLoop();
 
-// --------------- SCREEN SHARE ---------------
-startShareBtn.addEventListener('click', async ()=>{
-  if(!partnerAccepted){ alert('Partner must accept'); return; }
-  startShareBtn.disabled=true; stopShareBtn.disabled=false;
-  try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:false}); }catch(e){ alert('Screen share denied'); startShareBtn.disabled=false; stopShareBtn.disabled=true; return;}
-  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  const remoteStream = new MediaStream();
-  pc.ontrack=evt=>{ evt.streams[0].getTracks().forEach(tr=>remoteStream.addTrack(tr)); remoteVideo.srcObject=remoteStream; };
-  
-  const callId=`call_${userId}_${currentPartner}`;
-  callDocRef=sessionDoc(callId);
-  const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
-  await callDocRef.set({offer:{type:offer.type,sdp:offer.sdp},answer:null,iceCandidates:[]});
-  
-  pc.onicecandidate=async evt=>{ if(evt.candidate) await callDocRef.update({iceCandidates:firebase.firestore.FieldValue.arrayUnion(evt.candidate.toJSON())}); };
-  
-  callDocRef.onSnapshot(async snap=>{
-    const data = snap.data();
-    if(!data) return;
-    if(data.answer && !pc.currentRemoteDescription) await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-    if(data.iceCandidates) data.iceCandidates.forEach(async c=>{ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(e){console.warn(e);} });
-  });
-  remoteVideo.srcObject=remoteStream;
-});
+// ----------------- UI CONTROLS -----------------
+const colorInput=document.getElementById('color');
+const widthInput=document.getElementById('width');
+const eraseBtn=document.getElementById('eraseBtn');
+const undoBtn=document.getElementById('undoBtn');
+const clearBtn=document.getElementById('clearBtn');
+const exportBtn=document.getElementById('exportBtn');
+const startShareBtn=document.getElementById('startShare');
+const stopShareBtn=document.getElementById('stopShare');
+const remoteVideo=document.getElementById('remoteVideo');
 
-stopShareBtn.addEventListener('click', ()=>{
-  if(pc) pc.close();
-  if(localStream) localStream.getTracks().forEach(t=>t.stop());
-  startShareBtn.disabled=false; stopShareBtn.disabled=true;
-  remoteVideo.srcObject=null;
-  callDocRef=null; pc=null;
-});
+eraseBtn.addEventListener('click',()=>{ colorInput.value='#ffffff'; });
+undoBtn.addEventListener('click',()=>{ localStrokes.pop(); });
+clearBtn.addEventListener('click',async()=>{ await db.collection('sessions').doc(currentPartner||userId).set({strokes:[]}); remoteStrokesMap={}; });
+exportBtn.addEventListener('click',()=>{ const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`board_${Date.now()}.png`; a.click(); });
+
+document.getElementById('joinBtn').addEventListener('click',()=>sendInvite(document.getElementById('partnerId').value));
+listenIncomingInvites();
 </script>
 </body>
 </html>
