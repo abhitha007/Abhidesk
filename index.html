@@ -1,254 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Realtime Drawing Collaboration</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
-    #canvasContainer { position: relative; width: 100%; height: 80vh; }
-    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
-    #controls { margin: 10px; }
-    #userIdDisplay { font-weight: bold; color: blue; }
-    #status { margin-top: 5px; color: green; }
-    #joinButton { margin-left: 10px; }
-    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
-              left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
-    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
-    #modalClose { float: right; cursor: pointer; font-size: 20px;}
-    .modal-buttons button { margin: 5px; padding: 8px 15px; cursor: pointer; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Pro Collaborative Canvas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h2>Realtime Drawing Board</h2>
-  <p>Your User ID: <span id="userIdDisplay">loading...</span></p>
-
-  <div id="controls">
-    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
-    <button id="joinButton">Send Join Request</button>
-    <div id="status"></div>
-  </div>
-
-  <div id="canvasContainer">
-    <canvas id="canvas" width="800" height="600"></canvas>
-  </div>
-
-  <div id="modal">
-    <div id="modalContent">
-      <span id="modalClose">&times;</span>
-      <h3 id="modalTitle"></h3>
-      <p id="modalMessage"></p>
-      <div id="modalButtons" class="modal-buttons" style="display: none;">
-        <button id="acceptBtn">Accept</button>
-        <button id="rejectBtn">Reject</button>
-      </div>
+    <div class="header">
+        <h1>Pro Collaborative Canvas</h1>
     </div>
-  </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <div class="controls-container">
+        <div class="room-controls">
+            <input type="text" id="sessionIdInput" placeholder="Enter room ID or create one">
+            <button id="joinButton" class="btn primary-btn">Join Room</button>
+            <button id="leaveButton" class="btn secondary-btn" style="display: none;">Leave Room</button>
+        </div>
+        <div class="tool-controls">
+            <input type="color" id="colorPicker" value="#000000">
+            <input type="range" id="brushSize" min="2" max="20" value="5">
+            <button id="eraserButton" class="btn tool-btn">Eraser</button>
+            <button id="clearButton" class="btn tool-btn">Clear All</button>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <p>Current Room: <span id="currentRoomDisplay">Not joined</span> | Your ID: <span id="userIdDisplay">Loading...</span></p>
+    </div>
 
-  <script>
-    // ✅ Replace with your own Firebase config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID",
-      measurementId: "YOUR_MEASUREMENT_ID"
-    };
+    <div id="canvasContainer">
+        <canvas id="canvas"></canvas>
+    </div>
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    // Generate User ID
-    let userId = Math.random().toString(36).substring(2, 8);
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("userIdDisplay").innerText = userId;
-      ensureSession(userId);
-      listenForJoinRequests();
-      startSession([userId]);
-    });
-
-    // Firestore helpers
-    function getSessionDocRef(sessionId) {
-      return db.collection("sessions").doc(sessionId);
-    }
-    async function ensureSession(uid) {
-      const docRef = getSessionDocRef(uid);
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        await docRef.set({ strokes: [] });
-      }
-    }
-
-    // Canvas setup
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#000';
-    let drawing = false;
-    let currentStroke = { color: ctx.strokeStyle, points: [] };
-    let lastX, lastY;
-    function draw(x, y) {
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      lastX = x;
-      lastY = y;
-      currentStroke.points.push({ x, y });
-    }
-
-    canvas.addEventListener('mousedown', (e) => {
-      drawing = true;
-      lastX = e.offsetX;
-      lastY = e.offsetY;
-      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
-    });
-    canvas.addEventListener('mousemove', (e) => {
-      if (!drawing) return;
-      draw(e.offsetX, e.offsetY);
-    });
-    canvas.addEventListener('mouseup', async () => {
-      drawing = false;
-      if (currentStroke.points.length > 0) {
-        const docRef = getSessionDocRef(userId);
-        await docRef.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) }).catch(async () => {
-          await docRef.set({ strokes: [currentStroke] });
-        });
-        currentStroke = { color: ctx.strokeStyle, points: [] };
-      }
-    });
-
-    // Render strokes
-    function renderStrokes(strokes) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      strokes.forEach(stroke => {
-        if (stroke.points && stroke.points.length > 1) {
-          ctx.beginPath();
-          ctx.strokeStyle = stroke.color || '#000';
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
-          ctx.stroke();
-        }
-      });
-    }
-
-    // Session logic to handle multiple listeners
-    let sessionUnsubscribers = [];
-    let sessionData = {}; // New data store to hold strokes from all sessions
-
-    function startSession(sessionIds) {
-      // Clear previous listeners and data
-      sessionUnsubscribers.forEach(unsub => unsub());
-      sessionUnsubscribers = [];
-      sessionData = {};
-
-      const statusElement = document.getElementById('status');
-      
-      sessionIds.forEach(id => {
-        const docRef = getSessionDocRef(id);
-        
-        const unsub = docRef.onSnapshot((docSnap) => {
-          if (docSnap.exists) {
-            // Update the shared data store with the latest strokes from this session
-            sessionData[id] = docSnap.data().strokes || [];
-            
-            // Combine all strokes from the shared data store
-            const allStrokes = Object.values(sessionData).flat();
-            
-            // Render the combined strokes
-            renderStrokes(allStrokes);
-            
-            // Update status message
-            statusElement.innerText = `Joined sessions with: ${Object.keys(sessionData).join(', ')}`;
-          } else {
-             // If a session document is deleted, remove it from our data store
-             delete sessionData[id];
-             const allStrokes = Object.values(sessionData).flat();
-             renderStrokes(allStrokes);
-             statusElement.innerText = `Joined sessions with: ${Object.keys(sessionData).join(', ')}`;
-          }
-        });
-        sessionUnsubscribers.push(unsub);
-      });
-    }
-
-    // Modal
-    const modal = document.getElementById("modal");
-    const modalClose = document.getElementById("modalClose");
-    const modalButtons = document.getElementById("modalButtons");
-    function showModal(title, message, showButtons = false) {
-      document.getElementById("modalTitle").innerText = title;
-      document.getElementById("modalMessage").innerText = message;
-      modalButtons.style.display = showButtons ? 'block' : 'none';
-      modal.style.display = "block";
-    }
-    modalClose.onclick = () => { modal.style.display = "none"; };
-    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
-
-    // Joining Logic
-    document.getElementById('joinButton').addEventListener('click', async () => {
-      const targetId = document.getElementById('targetIdInput').value.trim();
-      if (!targetId || targetId === userId) {
-        showModal("Invalid ID", "Please enter a valid partner's User ID that is not your own.");
-        return;
-      }
-      const requestId = `${userId}-${targetId}`;
-      const requestRef = db.collection("join_requests").doc(requestId);
-      await requestRef.set({
-        requesterId: userId,
-        targetId: targetId,
-        status: 'pending',
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      document.getElementById('status').innerText = `Request sent to ${targetId}. Waiting for them to accept...`;
-
-      // Listen for the response
-      requestRef.onSnapshot(doc => {
-        if (doc.exists) {
-          const data = doc.data();
-          if (data.status === 'accepted') {
-            showModal("Request Accepted!", `${targetId} has accepted your request. Starting collaborative session.`);
-            startSession([userId, targetId]);
-            requestRef.delete().catch(e => console.log("Failed to delete request doc:", e));
-          } else if (data.status === 'rejected') {
-            showModal("Request Rejected", `${targetId} has rejected your request.`);
-            requestRef.delete().catch(e => console.log("Failed to delete request doc:", e));
-          }
-        }
-      });
-    });
-
-    // Listen for incoming requests
-    function listenForJoinRequests() {
-      db.collection("join_requests").where("targetId", "==", userId).where("status", "==", "pending").onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === "added") {
-            const requestData = change.doc.data();
-            const requesterId = requestData.requesterId;
-            const requestId = change.doc.id;
-            showModal("Join Request!", `${requesterId} wants to collaborate with you.`, true);
-            const acceptBtn = document.getElementById('acceptBtn');
-            const rejectBtn = document.getElementById('rejectBtn');
-
-            acceptBtn.onclick = async () => {
-              await db.collection("join_requests").doc(requestId).update({ status: 'accepted' });
-              showModal("Success!", `You've accepted ${requesterId}'s request. Collaboration started.`);
-              startSession([userId, requesterId]);
-            };
-            rejectBtn.onclick = async () => {
-              await db.collection("join_requests").doc(requestId).delete();
-              showModal("Request Rejected", `You've rejected ${requesterId}'s request.`);
-            };
-          }
-        });
-      });
-    }
-</script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
