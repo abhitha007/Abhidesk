@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDesk — Realtime Drawing + Screen Share</title>
+<title>AbhiDessk — Realtime Drawing + Screen Share</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
 :root{--bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)}
@@ -101,23 +101,28 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ----------------- USER & SESSION -----------------
+// ---------- USER & SESSION ----------
 let userId = localStorage.getItem('abhi_userid') || Math.random().toString(36).substring(2,9);
 localStorage.setItem('abhi_userid', userId);
 document.getElementById('userId').innerText = userId;
 
 let partnerAccepted=false, currentPartner=null;
 let localStrokes=[], currentStroke=null, drawing=false, lastX=0, lastY=0;
+let pc=null, localStream=null, remoteStream=null;
 
-// ----------------- CANVAS -----------------
-const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+// ---------- CANVAS ----------
+const canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
 function fitCanvas(){ const w=Math.min(1000,Math.max(320,window.innerWidth-260)); canvas.width=w; canvas.height=Math.round(w*0.6);}
 window.addEventListener('resize', fitCanvas); fitCanvas();
 
-// ----------------- HELPERS -----------------
-async function ensureSession(id){ const ref=db.collection('sessions').doc(id); if(!(await ref.get()).exists) await ref.set({strokes:[],requests:{}}); return ref; }
+// ---------- HELPERS ----------
+async function ensureSession(id){
+  const ref=db.collection('sessions').doc(id);
+  if(!(await ref.get()).exists) await ref.set({strokes:[],requests:{}});
+  return ref;
+}
 
-// ----------------- INVITATIONS -----------------
+// ---------- INVITATIONS ----------
 async function sendInvite(pid){
   if(!pid || pid===userId){ alert('Enter valid ID'); return; }
   currentPartner=pid;
@@ -187,7 +192,7 @@ async function declineRequest(reqId){
   await ref.update({requests:data.requests});
 }
 
-// ----------------- DRAWING -----------------
+// ---------- DRAWING ----------
 function toNormalized(x,y){ return {x:Math.round((x/canvas.width)*1000),y:Math.round((y/canvas.height)*600)};}
 function beginStroke(x,y){currentStroke={color:colorInput.value,width:parseInt(widthInput.value),points:[{x,y}]}; localStrokes.push(currentStroke);}
 function pushPoint(x,y){if(!currentStroke) return; currentStroke.points.push({x,y});}
@@ -204,16 +209,13 @@ canvas.addEventListener('mousemove',e=>{if(!drawing||!partnerAccepted) return; c
 canvas.addEventListener('mouseup',async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
 canvas.addEventListener('mouseleave',async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
 
-// ----------------- RENDER LOOP -----------------
+// ---------- RENDER ----------
 let remoteStrokesMap={};
-function listenPartnerStrokes(pid){
-  const ref=db.collection('sessions').doc(pid);
-  ref.onSnapshot(snap=>{ remoteStrokesMap[pid]=snap.data()?.strokes||[]; });
-}
+function listenPartnerStrokes(pid){ const ref=db.collection('sessions').doc(pid); ref.onSnapshot(snap=>{ remoteStrokesMap[pid]=snap.data()?.strokes||[]; }); }
 function renderLoop(){ ctx.clearRect(0,0,canvas.width,canvas.height); Object.values(remoteStrokesMap).forEach(arr=>arr.forEach(drawStroke)); localStrokes.forEach(drawStroke); requestAnimationFrame(renderLoop);}
 renderLoop();
 
-// ----------------- UI CONTROLS -----------------
+// ---------- UI ----------
 const colorInput=document.getElementById('color');
 const widthInput=document.getElementById('width');
 const eraseBtn=document.getElementById('eraseBtn');
