@@ -1,43 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎨 Pro Collaborative Canvas</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎨 Pro Collaborative Canvas</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="header">
-        <h1>Pro Collaborative Canvas00</h1>
-    </div>
+  <div class="header">
+    <h1>Pro Collaborative Canvas22</h1>
+  </div>
 
-    <div class="controls-container">
-        <div class="room-controls">
-            <input type="text" id="sessionIdInput" placeholder="Enter room ID or create one">
-            <button id="joinButton" class="btn primary-btn">Join Room</button>
-            <button id="leaveButton" class="btn secondary-btn" style="display: none;">Leave Room</button>
-        </div>
-        <div class="tool-controls">
-            <input type="color" id="colorPicker" value="#000000">
-            <input type="range" id="brushSize" min="2" max="20" value="5">
-            <button id="eraserButton" class="btn tool-btn">Eraser</button>
-            <button id="clearButton" class="btn tool-btn">Clear All</button>
-        </div>
+  <div class="controls-container">
+    <div class="room-controls">
+      <input type="text" id="sessionIdInput" placeholder="Enter room ID or create one">
+      <button id="joinButton" class="btn primary-btn">Join Room</button>
+      <button id="leaveButton" class="btn secondary-btn" style="display: none;">Leave Room</button>
     </div>
-    
-    <div class="status-bar">
-        <p>Current Room: <span id="currentRoomDisplay">Not joined</span> | Your ID: <span id="userIdDisplay">Loading...</span></p>
+    <div class="tool-controls">
+      <input type="color" id="colorPicker" value="#000000">
+      <input type="range" id="brushSize" min="2" max="20" value="5">
+      <button id="eraserButton" class="btn tool-btn">Eraser</button>
+      <button id="clearButton" class="btn tool-btn">Clear All</button>
     </div>
+  </div>
 
-    <div id="canvasContainer">
-        <canvas id="canvas"></canvas>
-    </div>
+  <div class="status-bar">
+    <p>
+      Current Room: <span id="currentRoomDisplay">Not joined</span> |
+      Your ID: <span id="userIdDisplay">Loading...</span>
+    </p>
+  </div>
 
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="app.js"></script>
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- Firebase (Compat SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Main Script -->
+  <script src="app.js"></script>
 </body>
 </html>
