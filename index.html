@@ -5,13 +5,32 @@
 <title>AbhiDesk — Realtime Drawing + Screen Share</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-:root{--bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)}
-*{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#071124,#081728);color:#e6eef6;overflow-x:hidden}
-.app{max-width:1100px;margin:24px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.6);transition:all 0.3s ease}
+:root{
+  --bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)
+}
+*{box-sizing:border-box} 
+body{
+  margin:0;font-family:Inter,Arial,sans-serif;
+  background:linear-gradient(180deg,#071124,#081728);
+  color:#e6eef6;overflow-x:hidden
+}
+.app{
+  max-width:1100px;margin:24px auto;padding:18px;
+  border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
+  box-shadow:0 8px 30px rgba(2,6,23,0.6);
+  transition:all 0.3s ease
+}
 header{display:flex;justify-content:space-between;align-items:center}
-.user-pill{background:var(--glass);padding:8px 12px;border-radius:999px;color:var(--accent);font-weight:600;transition:0.3s}
-.user-pill.connected{box-shadow:0 0 8px var(--accent);animation:glow 1.5s infinite alternate}
-@keyframes glow{0%{box-shadow:0 0 0 var(--accent)}100%{box-shadow:0 0 12px var(--accent)}}
+.user-pill{
+  background:var(--glass);padding:8px 12px;border-radius:999px;color:var(--accent);font-weight:600;transition:0.3s
+}
+.user-pill.connected{
+  box-shadow:0 0 12px var(--accent);animation:glow 1.5s infinite alternate
+}
+@keyframes glow{
+  0%{box-shadow:0 0 0 var(--accent)}100%{box-shadow:0 0 12px var(--accent)}
+}
 .controls{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap}
 input[type=text]{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;min-width:220px;transition:0.2s}
 input[type=text]:focus{border-color:var(--accent);outline:none}
@@ -39,7 +58,7 @@ video{width:100%;border-radius:8px;background:#000}
 <div class="controls">
   <div style="display:flex;gap:8px;align-items:center">
     <input id="partnerId" type="text" placeholder="Partner User ID (paste here)">
-    <button id="joinBtn">Connect</button>
+    <button id="joinBtn">Send Invite</button>
     <button id="createBtn" class="ghost">New ID</button>
   </div>
   <div style="margin-left:auto"><div id="connStatus" class="status">Not connected</div></div>
@@ -90,23 +109,21 @@ video{width:100%;border-radius:8px;background:#000}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-// ------------------ CONFIG ------------------
+// --------------- CONFIG ---------------
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
   projectId: "abhidesk-d26d0",
   storageBucket: "abhidesk-d26d0.appspot.com",
   messagingSenderId: "924205685340",
-  appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
-  measurementId: "G-ML9D0LTM0D"
+  appId: "1:924205685340:web:b33b4dfa2be1da2696a499"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ------------------ UI & STATE ------------------
+// --------------- STATE & UI ---------------
 const userIdEl = document.getElementById('userId');
-let userId = localStorage.getItem('abhi_userid') || generateId();
-function generateId(){ return Math.random().toString(36).substring(2,9); }
+let userId = localStorage.getItem('abhi_userid') || Math.random().toString(36).substring(2,9);
 localStorage.setItem('abhi_userid', userId);
 userIdEl.innerText = userId;
 
@@ -131,107 +148,69 @@ const remoteVideo = document.getElementById('remoteVideo');
 let remoteStrokesMap = {};
 let localStrokes = [];
 let currentStroke = null;
-let drawing = false, lastX=0, lastY=0;
+let drawing=false,lastX=0,lastY=0;
+let currentPartner=null;
+let partnerAccepted=false;
+let pc=null, localStream=null, callDocRef=null;
 
-let currentPartner = null;
-let currentConnectedSession = userId;
-let partnerAccepted = false;
-
-// ------------------ CANVAS FIT ------------------
+// --------------- CANVAS FIT ---------------
 function fitCanvas(){
-  const parentWidth = Math.min(1000, Math.max(320, window.innerWidth - 260));
-  const aspect = 1000/600;
-  canvas.width = parentWidth;
-  canvas.height = Math.round(parentWidth / aspect);
+  const w = Math.min(1000, Math.max(320, window.innerWidth - 260));
+  canvas.width=w;
+  canvas.height=Math.round(w*0.6);
 }
-window.addEventListener('resize', ()=>{ fitCanvas(); });
+window.addEventListener('resize', fitCanvas);
 fitCanvas();
 
-// ------------------ FIRESTORE HELPERS ------------------
-function docRefForSession(id){ return db.collection('sessions').doc(id); }
-async function ensureSessionDoc(id){
-  const ref = docRefForSession(id);
-  const snap = await ref.get();
-  if(!snap.exists) await ref.set({strokes: [], requests: {}});
+// --------------- FIRESTORE HELPERS ---------------
+function sessionDoc(id){ return db.collection('sessions').doc(id);}
+async function ensureSession(id){
+  const ref = sessionDoc(id);
+  if(!(await ref.get()).exists) await ref.set({strokes: [], requests:{}});
   return ref;
 }
 
-let listeners = {};
-function startListen(sessionId){
-  if(listeners[sessionId]) return;
-  const ref = docRefForSession(sessionId);
-  const unsub = ref.onSnapshot(docSnap=>{
-    if(!docSnap.exists) { remoteStrokesMap[sessionId]=[]; return; }
-    const data = docSnap.data() || {};
-    remoteStrokesMap[sessionId] = data.strokes || [];
-    
-    // Handle incoming connection requests
-    if(sessionId === userId && data.requests){
-      Object.keys(data.requests).forEach(rid=>{
-        const req = data.requests[rid];
-        if(req.status==='pending'){
-          notifyRequest(rid, req.from);
-        }
-      });
-    }
-  }, err=>{ console.error('listen error', err); });
-  listeners[sessionId] = unsub;
-}
-
-function stopAllListeners(){ Object.values(listeners).forEach(u=>u()); listeners={}; }
-
-// ------------------ NOTIFICATIONS ------------------
-function notifyRequest(requestId, fromId){
-  if(!("Notification" in window)) return;
+// --------------- INVITATIONS & CONNECTIONS ---------------
+function notifyRequest(reqId, fromId){
+  if(!('Notification' in window)) return;
   if(Notification.permission!=='granted') Notification.requestPermission();
-  const n = new Notification("AbhiDesk: Connection Request", {
-    body: `${fromId} wants to connect.`,
-    icon: 'https://cdn-icons-png.flaticon.com/512/135/135763.png',
-    requireInteraction: true
-  });
-  n.onclick = ()=>{ acceptRequest(requestId); n.close(); }
+  const n = new Notification('AbhiDesk Invite', {body:`${fromId} wants to connect.`, requireInteraction:true});
+  n.onclick = ()=>{ acceptRequest(reqId); n.close(); };
 }
 
-// ------------------ ACCEPT / DECLINE ------------------
 async function acceptRequest(reqId){
-  const ref = docRefForSession(userId);
-  const snap = await ref.get();
-  const data = snap.data();
+  const ref = sessionDoc(userId);
+  const data = (await ref.get()).data();
   if(!data.requests[reqId]) return;
   data.requests[reqId].status='accepted';
   await ref.update({requests:data.requests});
   currentPartner = data.requests[reqId].from;
-  currentConnectedSession = userId;
   partnerAccepted = true;
   userIdEl.classList.add('connected');
   connStatus.innerText = `Connected with ${currentPartner}`;
-  startShareBtn.disabled = false;
+  startShareBtn.disabled=false;
+  listenPartnerStrokes(currentPartner);
 }
 
 async function declineRequest(reqId){
-  const ref = docRefForSession(userId);
-  const snap = await ref.get();
-  const data = snap.data();
+  const ref = sessionDoc(userId);
+  const data = (await ref.get()).data();
   if(!data.requests[reqId]) return;
   data.requests[reqId].status='declined';
   await ref.update({requests:data.requests});
 }
 
-// ------------------ SESSION CONNECT ------------------
+// --------------- SEND INVITE ---------------
 joinBtn.addEventListener('click', async ()=>{
   const pid = partnerInput.value.trim();
-  if(!pid){ alert('Enter partner ID'); return; }
-  if(pid === userId){ alert('Enter a different ID'); return; }
-  currentPartner = pid;
-  const partnerRef = await ensureSessionDoc(currentPartner);
-  
-  // send request
+  if(!pid || pid===userId){ alert('Enter valid partner ID'); return;}
+  currentPartner=pid;
+  const partnerRef = await ensureSession(currentPartner);
   const reqId = Date.now()+'_'+userId;
   await partnerRef.update({[`requests.${reqId}`]: {from:userId, status:'pending'}});
-  connStatus.innerText = `Request sent to ${currentPartner}`;
-  
-  // listen for response
-  const unsubResp = partnerRef.onSnapshot(docSnap=>{
+  connStatus.innerText=`Invitation sent to ${currentPartner}`;
+
+  partnerRef.onSnapshot(docSnap=>{
     const data = docSnap.data();
     if(data.requests && data.requests[reqId]){
       const r = data.requests[reqId];
@@ -239,108 +218,108 @@ joinBtn.addEventListener('click', async ()=>{
         partnerAccepted=true;
         connStatus.innerText=`Partner ${currentPartner} accepted`;
         userIdEl.classList.add('connected');
-        startShareBtn.disabled = false;
-        unsubResp();
+        startShareBtn.disabled=false;
+        listenPartnerStrokes(currentPartner);
       } else if(r.status==='declined'){
         connStatus.innerText=`Partner ${currentPartner} declined`;
-        unsubResp();
       }
     }
   });
 });
 
-// ------------------ CANVAS DRAW ------------------
-function toNormalized(x,y){return {x:Math.round((x/canvas.width)*1000),y:Math.round((y/canvas.height)*600)};}
-function beginStroke(x,y){currentStroke={ color: colorInput.value, width: parseInt(widthInput.value,10), points:[{x,y}] }; localStrokes.push(currentStroke);}
-function pushPoint(x,y){if(!currentStroke)return; currentStroke.points.push({x,y});}
-async function endStroke(sessionId){if(!currentStroke) return; if(!partnerAccepted) {currentStroke=null;return;} const payload={...currentStroke}; try{await docRefForSession(sessionId).update({strokes: firebase.firestore.FieldValue.arrayUnion(payload)});} catch(e){console.error(e);} currentStroke=null;}
-
-function drawStroke(st){
-  if(!st||!st.points||st.points.length===0) return;
-  ctx.save();
-  ctx.lineWidth=st.width||2;
-  ctx.strokeStyle=st.color||'#000';
-  ctx.beginPath();
-  ctx.moveTo(st.points[0].x*(canvas.width/1000), st.points[0].y*(canvas.height/600));
-  for(let i=1;i<st.points.length;i++){const p=st.points[i];ctx.lineTo(p.x*(canvas.width/1000),p.y*(canvas.height/600));}
-  ctx.stroke();
-  ctx.restore();
+// --------------- DRAWING LOGIC ---------------
+function norm(x,y){return {x: Math.round((x/canvas.width)*1000), y: Math.round((y/canvas.height)*600)};}
+function beginStroke(x,y){currentStroke={color:colorInput.value,width:parseInt(widthInput.value),points:[{x,y}]}; localStrokes.push(currentStroke);}
+function pushPoint(x,y){if(!currentStroke) return; currentStroke.points.push({x,y});}
+async function endStroke(sessionId){
+  if(!currentStroke || !partnerAccepted) {currentStroke=null; return;}
+  try{await sessionDoc(sessionId).update({strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke)});}catch(e){console.error(e);}
+  currentStroke=null;
+}
+function drawStroke(s){
+  if(!s||!s.points?.length) return;
+  ctx.save(); ctx.lineWidth=s.width||2; ctx.strokeStyle=s.color||'#000'; ctx.beginPath();
+  ctx.moveTo(s.points[0].x*(canvas.width/1000), s.points[0].y*(canvas.height/600));
+  s.points.slice(1).forEach(p=>ctx.lineTo(p.x*(canvas.width/1000), p.y*(canvas.height/600)));
+  ctx.stroke(); ctx.restore();
 }
 
-// pointer events
-function pointerDown(e){if(!partnerAccepted)return; e.preventDefault(); drawing=true; const rect=canvas.getBoundingClientRect(); const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left; const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top; const n=toNormalized(x,y); beginStroke(n.x,n.y); lastX=x; lastY=y;}
-function pointerMove(e){if(!drawing) return; if(!partnerAccepted) return; e.preventDefault(); const rect=canvas.getBoundingClientRect(); const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left; const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top; const n=toNormalized(x,y); pushPoint(n.x,n.y); ctx.save(); ctx.lineWidth=parseInt(widthInput.value,10); ctx.strokeStyle=colorInput.value; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke(); ctx.restore(); lastX=x; lastY=y;}
-async function pointerUp(e){if(!drawing) return; drawing=false; await endStroke(currentConnectedSession||userId);}
-canvas.addEventListener('mousedown',pointerDown);
-canvas.addEventListener('mousemove',pointerMove);
-canvas.addEventListener('mouseup',pointerUp);
-canvas.addEventListener('mouseleave',pointerUp);
-canvas.addEventListener('touchstart',pointerDown,{passive:false});
-canvas.addEventListener('touchmove',pointerMove,{passive:false});
-canvas.addEventListener('touchend',pointerUp);
+canvas.addEventListener('mousedown', e=>{
+  if(!partnerAccepted) return;
+  drawing=true;
+  const rect=canvas.getBoundingClientRect();
+  const {x,y}=norm(e.clientX-rect.left, e.clientY-rect.top);
+  beginStroke(x,y);
+  lastX=e.clientX-rect.left; lastY=e.clientY-rect.top;
+});
+canvas.addEventListener('mousemove', e=>{
+  if(!drawing||!partnerAccepted) return;
+  const rect=canvas.getBoundingClientRect();
+  const {x,y}=norm(e.clientX-rect.left, e.clientY-rect.top);
+  pushPoint(x,y);
+  ctx.save(); ctx.lineWidth=parseInt(widthInput.value); ctx.strokeStyle=colorInput.value;
+  ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(e.clientX-rect.left,e.clientY-rect.top); ctx.stroke(); ctx.restore();
+  lastX=e.clientX-rect.left; lastY=e.clientY-rect.top;
+});
+canvas.addEventListener('mouseup', async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
+canvas.addEventListener('mouseleave', async ()=>{if(!drawing) return; drawing=false; await endStroke(currentPartner||userId);});
 
-// tools
+// --------------- TOOLS ---------------
 eraseBtn.addEventListener('click', ()=>{ colorInput.value='#ffffff'; });
 undoBtn.addEventListener('click', ()=>{ localStrokes.pop(); });
-clearBtn.addEventListener('click', async ()=>{ try{ await docRefForSession(currentConnectedSession||userId).set({strokes:[]}); remoteStrokesMap={};} catch(e){console.error(e);} });
+clearBtn.addEventListener('click', async ()=>{ await sessionDoc(currentPartner||userId).set({strokes:[]}); remoteStrokesMap={}; });
 exportBtn.addEventListener('click', ()=>{ const url=canvas.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`board_${Date.now()}.png`; a.click(); });
 
-// ------------------ SCREEN SHARE ------------------
-let pc=null, localStream=null, callDocRef=null;
+// --------------- RENDER LOOP ---------------
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  Object.values(remoteStrokesMap).forEach(sts=>sts.forEach(drawStroke));
+  localStrokes.forEach(drawStroke);
+  requestAnimationFrame(render);
+}
+render();
+
+// --------------- PARTNER STROKES LISTENER ---------------
+function listenPartnerStrokes(pid){
+  sessionDoc(pid).onSnapshot(docSnap=>{
+    if(!docSnap.exists) return;
+    remoteStrokesMap[pid]=docSnap.data().strokes||[];
+  });
+}
+
+// --------------- SCREEN SHARE ---------------
 startShareBtn.addEventListener('click', async ()=>{
-  if(!partnerAccepted){ alert('Partner must accept first'); return; }
+  if(!partnerAccepted){ alert('Partner must accept'); return; }
   startShareBtn.disabled=true; stopShareBtn.disabled=false;
-  try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:false}); } catch(e){alert('Screen share denied'); startShareBtn.disabled=false; stopShareBtn.disabled=true; return;}
-  pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+  try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:false}); }catch(e){ alert('Screen share denied'); startShareBtn.disabled=false; stopShareBtn.disabled=true; return;}
+  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
   const remoteStream = new MediaStream();
-  pc.ontrack = (evt)=>{ evt.streams[0].getTracks().forEach(tr=>remoteStream.addTrack(tr)); remoteVideo.srcObject = remoteStream; };
-  const callId = `${userId}_${currentPartner}`;
-  callDocRef = db.collection('calls').doc(callId);
-  const offerCandidates = callDocRef.collection('offerCandidates');
-  const answerCandidates = callDocRef.collection('answerCandidates');
-  pc.onicecandidate = e=>{if(e.candidate) offerCandidates.add(e.candidate.toJSON());};
-  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-  await callDocRef.set({offer:{type:offer.type,sdp:offer.sdp},caller:userId,callee:currentPartner});
-  callDocRef.onSnapshot(async snap=>{ const data = snap.data(); if(data && data.answer && !pc.currentRemoteDescription){ await pc.setRemoteDescription(new RTCSessionDescription(data.answer)); }});
-  answerCandidates.onSnapshot(snap=>{ snap.docChanges().forEach(async ch=>{ if(ch.type==='added'){ try{ await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); }catch(e){console.error(e);} }})});
-  localStream.getVideoTracks()[0].onended = ()=>{ stopScreenShare(); };
-  connStatus.innerText='Screen share started';
+  pc.ontrack=evt=>{ evt.streams[0].getTracks().forEach(tr=>remoteStream.addTrack(tr)); remoteVideo.srcObject=remoteStream; };
+  
+  const callId=`call_${userId}_${currentPartner}`;
+  callDocRef=sessionDoc(callId);
+  const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+  await callDocRef.set({offer:{type:offer.type,sdp:offer.sdp},answer:null,iceCandidates:[]});
+  
+  pc.onicecandidate=async evt=>{ if(evt.candidate) await callDocRef.update({iceCandidates:firebase.firestore.FieldValue.arrayUnion(evt.candidate.toJSON())}); };
+  
+  callDocRef.onSnapshot(async snap=>{
+    const data = snap.data();
+    if(!data) return;
+    if(data.answer && !pc.currentRemoteDescription) await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    if(data.iceCandidates) data.iceCandidates.forEach(async c=>{ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(e){console.warn(e);} });
+  });
+  remoteVideo.srcObject=remoteStream;
 });
 
-(function watchIncomingCalls(){
-  const callsCol = db.collection('calls');
-  callsCol.where('callee','==',userId).onSnapshot(snapshot=>{
-    snapshot.docChanges().forEach(async change=>{
-      if(change.type==='added'){
-        const doc = change.doc;
-        const data = doc.data();
-        if(!data || !data.offer) return;
-        const pc2 = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-        const remoteStream2 = new MediaStream();
-        pc2.ontrack = evt=>{ evt.streams[0].getTracks().forEach(tr=>remoteStream2.addTrack(tr)); remoteVideo.srcObject = remoteStream2; };
-        const localStream2 = await navigator.mediaDevices.getUserMedia({video:false,audio:false});
-        pc2.onicecandidate = e=>{ if(e.candidate) doc.ref.collection('answerCandidates').add(e.candidate.toJSON()); };
-        pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc2.createAnswer();
-        await pc2.setLocalDescription(answer);
-        await doc.ref.update({answer:{type:answer.type,sdp:answer.sdp}});
-        pc = pc2;
-      }
-    });
-  });
-})();
-
-function stopScreenShare(){
-  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
-  if(pc){ pc.close(); pc=null; }
+stopShareBtn.addEventListener('click', ()=>{
+  if(pc) pc.close();
+  if(localStream) localStream.getTracks().forEach(t=>t.stop());
   startShareBtn.disabled=false; stopShareBtn.disabled=true;
-  connStatus.innerText='Screen share stopped';
-}
-stopShareBtn.addEventListener('click', stopScreenShare);
-
-// ------------------ INIT ------------------
-ensureSessionDoc(userId).then(()=> startListen(userId));
+  remoteVideo.srcObject=null;
+  callDocRef=null; pc=null;
+});
 </script>
 </body>
 </html>
