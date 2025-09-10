@@ -2,51 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎨 Realtime Collaborative Canvas</title>
-
+  <title>Realtime Drawing Collaboration</title>
   <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #f9f9f9;
-    }
-
-    h1 {
-      margin: 20px 0;
-      color: #007BFF;
-    }
-
-    #canvasContainer {
-      width: 95%;
-      height: 80vh;
-      border: 2px solid #007BFF;
-      background: #fff;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
+    #canvasContainer { position: relative; width: 100%; height: 80vh; }
+    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
+    #controls { margin: 10px; }
+    #userIdDisplay { font-weight: bold; color: blue; }
+    #status { margin-top: 5px; color: green; }
+    #joinButton { margin-left: 10px; }
+    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
+             left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
+    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
+    #modalClose { float: right; cursor: pointer; font-size: 20px;}
   </style>
 </head>
 <body>
-  <h1>Realtime Collaborative Canvas</h1>
-  <div id="canvasContainer">
-    <canvas id="canvas"></canvas>
+  <h2>Realtime Drawing Board</h2>
+  <p>Your User ID: <span id="userIdDisplay">loading...</span></p>
+
+  <div id="controls">
+    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
+    <button id="joinButton">Join Session</button>
+    <div id="status"></div>
   </div>
 
-  <!-- Firebase SDK (Compat) -->
+  <div id="canvasContainer">
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal">
+    <div id="modalContent">
+      <span id="modalClose">&times;</span>
+      <h3 id="modalTitle"></h3>
+      <p id="modalMessage"></p>
+    </div>
+  </div>
+
+  <!-- ✅ Firebase SDKs (CDN for GitHub Pages) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
-    // ✅ Firebase config (fixed storageBucket)
+    // ✅ Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
       authDomain: "abhidesk-d26d0.firebaseapp.com",
@@ -60,44 +60,128 @@
     // ✅ Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
 
-    // ✅ Canvas setup
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // ✅ Generate User ID
+    let userId = Math.random().toString(36).substring(2, 8);
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("userIdDisplay").innerText = userId;
+    });
+
+    // Firestore helpers
+    function getSessionDocRef(sessionId) {
+      return db.collection("sessions").doc(sessionId);
+    }
+
+    async function ensureSession(uid) {
+      const docRef = getSessionDocRef(uid);
+      const docSnap = await docRef.get();
+      if (!docSnap.exists) {
+        await docRef.set({ strokes: [] });
+      }
+    }
+
+    // Create session for self
+    ensureSession(userId);
+
+    // Canvas setup
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000';
 
     let drawing = false;
-    let sessionId = "test-room"; // Default room
+    let currentStroke = { color: ctx.strokeStyle, points: [] };
+    let lastX, lastY;
 
-    canvas.addEventListener("mousedown", () => drawing = true);
-    canvas.addEventListener("mouseup", () => drawing = false);
-    canvas.addEventListener("mousemove", draw);
+    function draw(x, y) {
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x;
+      lastY = y;
+      currentStroke.points.push({ x, y });
+    }
 
-    function draw(e) {
+    canvas.addEventListener('mousedown', (e) => {
+      drawing = true;
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
       if (!drawing) return;
-      const x = e.offsetX;
-      const y = e.offsetY;
-      ctx.fillRect(x, y, 2, 2);
+      draw(e.offsetX, e.offsetY);
+    });
 
-      // Save to Firestore
-      db.collection("sessions").doc(sessionId).collection("strokes").add({
-        x, y,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    canvas.addEventListener('mouseup', async () => {
+      drawing = false;
+      if (currentStroke.points.length > 0) {
+        const docRef = getSessionDocRef(userId);
+        await docRef.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) })
+          .catch(async () => {
+            await docRef.set({ strokes: [currentStroke] });
+          });
+        currentStroke = { color: ctx.strokeStyle, points: [] };
+      }
+    });
+
+    // Render strokes
+    function renderStrokes(strokes) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      strokes.forEach(stroke => {
+        if (stroke.points && stroke.points.length > 1) {
+          ctx.beginPath();
+          ctx.strokeStyle = stroke.color || '#000';
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
+          ctx.stroke();
+        }
       });
     }
 
-    // ✅ Realtime listener
-    db.collection("sessions").doc(sessionId).collection("strokes")
-      .orderBy("timestamp")
-      .onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === "added") {
-            const { x, y } = change.doc.data();
-            ctx.fillRect(x, y, 2, 2);
-          }
-        });
+    // Session listener
+    let unsubscribe = () => {};
+    function startListening(sessionId) {
+      if (unsubscribe) unsubscribe();
+      const docRef = getSessionDocRef(sessionId);
+      unsubscribe = docRef.onSnapshot((docSnap) => {
+        if (docSnap.exists) {
+          renderStrokes(docSnap.data().strokes || []);
+        }
       });
+      document.getElementById('status').innerText = `Joined session with User ID: ${sessionId}`;
+    }
+
+    // Join partner session
+    document.getElementById('joinButton').addEventListener('click', async () => {
+    const targetIdInput = document.getElementById('targetIdInput').value.trim();
+    if (!targetIdInput || targetIdInput === userId) {
+      showModal("Invalid", "Enter a different User ID.");
+      return;
+    }
+
+    // 👇 Listen to both my session & partner session
+    startListening(userId);
+    startListening(targetIdInput);
+
+    document.getElementById('status').innerText =
+      `Now sharing between ${userId} and ${targetIdInput}`;
+  });
+
+
+    // Modal
+    const modal = document.getElementById("modal");
+    const modalClose = document.getElementById("modalClose");
+    function showModal(title, message) {
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalMessage").innerText = message;
+      modal.style.display = "block";
+    }
+    modalClose.onclick = () => { modal.style.display = "none"; };
+    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
   </script>
 </body>
 </html>
