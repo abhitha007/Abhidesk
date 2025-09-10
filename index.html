@@ -157,19 +157,20 @@
 
     // Join partner session
     document.getElementById('joinButton').addEventListener('click', async () => {
-      const targetIdInput = document.getElementById('targetIdInput').value.trim();
-      if (!targetIdInput || targetIdInput === userId) {
-        showModal("Invalid", "Enter a different User ID.");
-        return;
-      }
-      const docRef = getSessionDocRef(targetIdInput);
-      const docSnap = await docRef.get();
-      if (docSnap.exists) {
-        startListening(targetIdInput);
-      } else {
-        showModal("Session Not Found", "Partner’s session doesn’t exist yet.");
-      }
-    });
+    const targetIdInput = document.getElementById('targetIdInput').value.trim();
+    if (!targetIdInput || targetIdInput === userId) {
+      showModal("Invalid", "Enter a different User ID.");
+      return;
+    }
+
+    // 👇 Listen to both my session & partner session
+    startListening(userId);
+    startListening(targetIdInput);
+
+    document.getElementById('status').innerText =
+      `Now sharing between ${userId} and ${targetIdInput}`;
+  });
+
 
     // Modal
     const modal = document.getElementById("modal");
