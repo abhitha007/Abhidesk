@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDessk — Realtime Drawing + Screen Share</title>
+<title>AbhiDesk — Realtime Drawing + Screen Share</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
 :root{--bg:#0f1724;--accent:#06b6d4;--muted:#9aa7b2;--glass:rgba(255,255,255,0.03)}
@@ -115,10 +115,10 @@ const canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
 function fitCanvas(){ const w=Math.min(1000,Math.max(320,window.innerWidth-260)); canvas.width=w; canvas.height=Math.round(w*0.6);}
 window.addEventListener('resize', fitCanvas); fitCanvas();
 
-// ---------- HELPERS ----------
+// ---------- FIRESTORE SESSION ----------
 async function ensureSession(id){
   const ref=db.collection('sessions').doc(id);
-  if(!(await ref.get()).exists) await ref.set({strokes:[],requests:{}});
+  if(!(await ref.get()).exists) await ref.set({strokes:[],requests:{},webrtc:{offer:null,answer:null,ice:[]}});
   return ref;
 }
 
@@ -193,6 +193,8 @@ async function declineRequest(reqId){
 }
 
 // ---------- DRAWING ----------
+const colorInput=document.getElementById('color');
+const widthInput=document.getElementById('width');
 function toNormalized(x,y){ return {x:Math.round((x/canvas.width)*1000),y:Math.round((y/canvas.height)*600)};}
 function beginStroke(x,y){currentStroke={color:colorInput.value,width:parseInt(widthInput.value),points:[{x,y}]}; localStrokes.push(currentStroke);}
 function pushPoint(x,y){if(!currentStroke) return; currentStroke.points.push({x,y});}
@@ -215,9 +217,7 @@ function listenPartnerStrokes(pid){ const ref=db.collection('sessions').doc(pid)
 function renderLoop(){ ctx.clearRect(0,0,canvas.width,canvas.height); Object.values(remoteStrokesMap).forEach(arr=>arr.forEach(drawStroke)); localStrokes.forEach(drawStroke); requestAnimationFrame(renderLoop);}
 renderLoop();
 
-// ---------- UI ----------
-const colorInput=document.getElementById('color');
-const widthInput=document.getElementById('width');
+// ---------- UI BUTTONS ----------
 const eraseBtn=document.getElementById('eraseBtn');
 const undoBtn=document.getElementById('undoBtn');
 const clearBtn=document.getElementById('clearBtn');
@@ -233,6 +233,51 @@ exportBtn.addEventListener('click',()=>{ const url=canvas.toDataURL('image/png')
 
 document.getElementById('joinBtn').addEventListener('click',()=>sendInvite(document.getElementById('partnerId').value));
 listenIncomingInvites();
+
+// ---------- SCREEN SHARE WEBRTC ----------
+async function initWebRTC(){
+  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  remoteStream=new MediaStream();
+  remoteVideo.srcObject=remoteStream;
+
+  pc.ontrack = e=>{ e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t)); };
+  pc.onicecandidate = async e=>{
+    if(e.candidate) await db.collection('sessions').doc(currentPartner).update({webrtc:firebase.firestore.FieldValue.arrayUnion({type:'ice',candidate:e.candidate.toJSON()})});
+  };
+}
+
+startShareBtn.addEventListener('click',async()=>{
+  if(!partnerAccepted){ alert('Connect first'); return; }
+  localStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await db.collection('sessions').doc(currentPartner).update({webrtc:{offer:offer.toJSON(),answer:null,ice:[]}});
+  stopShareBtn.disabled=false;
+});
+
+stopShareBtn.addEventListener('click',()=>{
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  stopShareBtn.disabled=true;
+});
+
+async function listenWebRTC(){
+  if(!currentPartner) return;
+  const ref = db.collection('sessions').doc(currentPartner);
+  ref.onSnapshot(async snap=>{
+    const data = snap.data();
+    if(!data.webrtc) return;
+    if(data.webrtc.offer && !data.webrtc.answer){
+      if(!pc) await initWebRTC();
+      await pc.setRemoteDescription(new RTCSessionDescription(data.webrtc.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await db.collection('sessions').doc(currentPartner).update({webrtc:{offer:data.webrtc.offer,answer:answer.toJSON(),ice:[]}})
+    }
+    if(data.webrtc.ice) for(let i of data.webrtc.ice){ try{ await pc.addIceCandidate(new RTCIceCandidate(i.candidate)); } catch(e){} }
+  });
+}
+listenWebRTC();
 </script>
 </body>
 </html>
