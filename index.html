@@ -1,187 +1,573 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Realtime Drawing Collaboration</title>
+  <meta charset="utf-8" />
+  <title>Realtime Drawing + Screen Share (Advanced)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
-    #canvasContainer { position: relative; width: 100%; height: 80vh; }
-    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
-    #controls { margin: 10px; }
-    #userIdDisplay { font-weight: bold; color: blue; }
-    #status { margin-top: 5px; color: green; }
-    #joinButton { margin-left: 10px; }
-    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
-             left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
-    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
-    #modalClose { float: right; cursor: pointer; font-size: 20px;}
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa7b2; --accent:#06b6d4;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter, system-ui, -apple-system, Arial, sans-serif;background:linear-gradient(180deg,#071124 0%, #081728 60%);color:#e6eef6}
+    .app{max-width:1100px;margin:24px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header h1{margin:0;font-size:20px;letter-spacing:0.2px}
+    .user-pill{background:var(--glass);padding:8px 12px;border-radius:999px;font-weight:600;color:var(--accent)}
+    .controls{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap}
+    .controls .left, .controls .right{display:flex;gap:8px;align-items:center}
+    input[type=text]{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;min-width:220px}
+    button{background:var(--accent);color:#042027;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .canvas-wrap{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:16px}
+    .board{background:#071026;border-radius:10px;padding:12px;display:flex;flex-direction:column;align-items:center}
+    #canvas{border-radius:8px;background:#fff;touch-action:none;display:block;max-width:100%;height:auto;}
+    .toolbar{display:flex;flex-direction:column;gap:10px;width:100%}
+    .tool-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    label{font-size:13px;color:var(--muted)}
+    .session-list{max-height:420px;overflow:auto;padding-right:6px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006));padding:8px;border-radius:8px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.02)}
+    .status{font-size:13px;color:var(--muted)}
+    video{width:100%;border-radius:8px;background:#000}
+    .bottom-row{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+    @media (max-width:980px){.canvas-wrap{grid-template-columns:1fr;}.controls input[type=text]{min-width:140px}}
   </style>
 </head>
 <body>
-  <h2>Realtime Drawing Board</h2>
-  <p>Your User ID: <span id="userIdDisplay">loading...</span></p>
+  <div class="app">
+    <header>
+      <div>
+        <h1>AbhiDesk — Realtime Drawing + Screen Share</h1>
+        <div class="status">Collaborative whiteboard with optional screen sharing</div>
+      </div>
+      <div>
+        Your User ID: <span id="userId" class="user-pill">...</span>
+      </div>
+    </header>
 
-  <div id="controls">
-    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
-    <button id="joinButton">Join Session</button>
-    <div id="status"></div>
-  </div>
+    <div class="controls">
+      <div class="left">
+        <input id="partnerId" type="text" placeholder="Partner User ID (paste here)">
+        <button id="joinBtn">Connect</button>
+        <button id="createBtn" class="ghost">New ID</button>
+      </div>
 
-  <div id="canvasContainer">
-    <canvas id="canvas" width="800" height="600"></canvas>
-  </div>
-
-  <!-- Modal -->
-  <div id="modal">
-    <div id="modalContent">
-      <span id="modalClose">&times;</span>
-      <h3 id="modalTitle"></h3>
-      <p id="modalMessage"></p>
+      <div class="right">
+        <div class="status" id="connStatus">Not connected</div>
+      </div>
     </div>
+
+    <div class="canvas-wrap">
+      <div class="board">
+        <div class="toolbar" style="width:100%;max-width:900px;">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="tool-row">
+              <label>Color</label>
+              <input id="color" type="color" value="#000000" style="width:44px;height:34px;border-radius:6px;border:0;margin-left:8px">
+              <label style="margin-left:8px">Width</label>
+              <input id="width" type="range" min="1" max="20" value="2" style="width:120px;margin-left:8px">
+              <button id="eraseBtn" class="ghost">Eraser</button>
+            </div>
+            <div>
+              <button id="undoBtn" class="ghost">Undo</button>
+              <button id="clearBtn" class="ghost">Clear</button>
+              <button id="exportBtn">Export PNG</button>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <canvas id="canvas" width="1000" height="600"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Session</strong>
+            <small class="status">Share or paste partner ID</small>
+          </div>
+          <div style="margin-top:8px">
+            <div><button id="listenSelf" class="ghost">Listen to my session</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Screen Share</strong>
+          <div style="margin-top:8px">
+            <button id="startShare">Start Screen Share</button>
+            <button id="stopShare" class="ghost" disabled>Stop Share</button>
+          </div>
+          <div style="margin-top:10px">
+            <label class="status">Remote Screen:</label>
+            <div style="margin-top:6px">
+              <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>Info</strong>
+          <div class="session-list" style="margin-top:8px">
+            <div class="status">Tips:</div>
+            <ul>
+              <li>Connect by entering partner ID and clicking Connect.</li>
+              <li>Use Screen Share to stream your screen to partner.</li>
+              <li>Strokes are saved to Firestore (per-session). Clear only clears your session (optionally both if you want).</li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </div>
+
   </div>
 
-  <!-- ✅ Firebase SDKs (CDN for GitHub Pages) -->
+  <!-- Firebase compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
-    // ✅ Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
-      authDomain: "abhidesk-d26d0.firebaseapp.com",
-      projectId: "abhidesk-d26d0",
-      storageBucket: "abhidesk-d26d0.appspot.com",
-      messagingSenderId: "924205685340",
-      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
-      measurementId: "G-ML9D0LTM0D"
-    };
+  // ---------- Firebase config (use your keys) ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+    authDomain: "abhidesk-d26d0.firebaseapp.com",
+    projectId: "abhidesk-d26d0",
+    storageBucket: "abhidesk-d26d0.appspot.com",
+    messagingSenderId: "924205685340",
+    appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+    measurementId: "G-ML9D0LTM0D"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    // ✅ Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+  // ---------- IDs ----------
+  const userIdEl = document.getElementById('userId');
+  let userId = localStorage.getItem('abhi_userid') || generateId();
+  localStorage.setItem('abhi_userid', userId);
+  userIdEl.innerText = userId;
 
-    // ✅ Generate User ID
-    let userId = Math.random().toString(36).substring(2, 8);
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("userIdDisplay").innerText = userId;
+  function generateId(){
+    return Math.random().toString(36).substring(2,9);
+  }
+
+  // UI elements
+  const partnerInput = document.getElementById('partnerId');
+  const joinBtn = document.getElementById('joinBtn');
+  const createBtn = document.getElementById('createBtn');
+  const connStatus = document.getElementById('connStatus');
+  const listenSelfBtn = document.getElementById('listenSelf');
+
+  // Canvas elements
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const colorInput = document.getElementById('color');
+  const widthInput = document.getElementById('width');
+  const eraseBtn = document.getElementById('eraseBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const exportBtn = document.getElementById('exportBtn');
+
+  // Screen share
+  const startShareBtn = document.getElementById('startShare');
+  const stopShareBtn = document.getElementById('stopShare');
+  const remoteVideo = document.getElementById('remoteVideo');
+
+  // Drawing state
+  let drawing=false, lastX=0, lastY=0;
+  let currentStroke=null;
+  let localStrokes=[]; // local undo stack
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // scale handling (so canvas looks good on high-dpi)
+  function fitCanvas(){
+    const parentWidth = Math.min(1000, Math.max(320, window.innerWidth - 260));
+    const aspect = 1000/600;
+    canvas.width = parentWidth;
+    canvas.height = Math.round(parentWidth / aspect);
+    redrawLocalAndRemote(); // re-render after resize
+  }
+  window.addEventListener('resize', fitCanvas);
+  fitCanvas();
+
+  // Utilities
+  function docRefForSession(id){ return db.collection('sessions').doc(id); }
+  async function ensureSessionDoc(id){
+    const ref = docRefForSession(id);
+    const snap = await ref.get();
+    if(!snap.exists) await ref.set({strokes: []});
+    return ref;
+  }
+
+  // Start listening to a session (merges created streams)
+  let listeners = {};
+  function startListen(sessionId, onUpdate){
+    if(listeners[sessionId]) return;
+    const ref = docRefForSession(sessionId);
+    const unsub = ref.onSnapshot(snap => {
+      if(!snap.exists) return;
+      const data = snap.data() || {};
+      onUpdate(data.strokes || []);
     });
+    listeners[sessionId] = unsub;
+  }
+  function stopAllListeners(){
+    Object.values(listeners).forEach(u=>u());
+    listeners = {};
+  }
 
-    // Firestore helpers
-    function getSessionDocRef(sessionId) {
-      return db.collection("sessions").doc(sessionId);
-    }
-
-    async function ensureSession(uid) {
-      const docRef = getSessionDocRef(uid);
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        await docRef.set({ strokes: [] });
-      }
-    }
-
-    // Create session for self
-    ensureSession(userId);
-
-    // Canvas setup
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#000';
-
-    let drawing = false;
-    let currentStroke = { color: ctx.strokeStyle, points: [] };
-    let lastX, lastY;
-
-    function draw(x, y) {
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      lastX = x;
-      lastY = y;
-      currentStroke.points.push({ x, y });
-    }
-
-    canvas.addEventListener('mousedown', (e) => {
-      drawing = true;
-      lastX = e.offsetX;
-      lastY = e.offsetY;
-      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
+  // Drawing functions
+  function beginStroke(x,y){
+    currentStroke = { color: colorInput.value, width: parseInt(widthInput.value,10), points: [{x,y}] };
+    localStrokes.push(currentStroke); // push for local undo
+  }
+  function pushPoint(x,y){
+    if(!currentStroke) return;
+    currentStroke.points.push({x,y});
+  }
+  function endStroke(sessionId){
+    if(!currentStroke) return;
+    // Save to Firestore using arrayUnion to avoid overwriting
+    const payload = {...currentStroke};
+    docRefForSession(sessionId).update({
+      strokes: firebase.firestore.FieldValue.arrayUnion(payload)
+    }).catch(async (err)=>{
+      // if update failed (doc may not exist) -> set
+      await docRefForSession(sessionId).set({strokes:[payload]});
     });
+    currentStroke = null;
+  }
 
-    canvas.addEventListener('mousemove', (e) => {
-      if (!drawing) return;
-      draw(e.offsetX, e.offsetY);
+  // Local redraw combined with remote strokes
+  let remoteStrokesMap = {}; // sessionId => strokes []
+  function redrawLocalAndRemote(){
+    // clear
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // draw remote strokes first (lighter)
+    Object.keys(remoteStrokesMap).forEach(sid=>{
+      const list = remoteStrokesMap[sid]||[];
+      list.forEach(st=>drawStroke(st));
     });
+  }
+  function drawStroke(st){
+    if(!st.points || st.points.length===0) return;
+    ctx.save();
+    ctx.lineWidth = st.width || 2;
+    ctx.strokeStyle = st.color || '#000';
+    ctx.beginPath();
+    ctx.moveTo(st.points[0].x * (canvas.width / 1000), st.points[0].y * (canvas.height / 600));
+    for(let i=1;i<st.points.length;i++){
+      const p = st.points[i];
+      ctx.lineTo(p.x * (canvas.width / 1000), p.y * (canvas.height / 600));
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
 
-    canvas.addEventListener('mouseup', async () => {
-      drawing = false;
-      if (currentStroke.points.length > 0) {
-        const docRef = getSessionDocRef(userId);
-        await docRef.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) })
-          .catch(async () => {
-            await docRef.set({ strokes: [currentStroke] });
-          });
-        currentStroke = { color: ctx.strokeStyle, points: [] };
-      }
+  // Convert pointer coordinate into normalized system (saves bandwidth)
+  function toNormalized(x,y){
+    // store relative coordinates based on 1000x600 canonical canvas
+    const nx = Math.round((x / canvas.width) * 1000);
+    const ny = Math.round((y / canvas.height) * 600);
+    return {x: nx, y: ny};
+  }
+
+  // Mouse & touch handlers
+  function pointerDown(e){
+    e.preventDefault();
+    drawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const n = toNormalized(x,y);
+    beginStroke(n.x,n.y);
+    lastX = x; lastY = y;
+  }
+  function pointerMove(e){
+    if(!drawing) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const n = toNormalized(x,y);
+    pushPoint(n.x,n.y);
+    // draw locally incremental
+    ctx.save();
+    ctx.lineWidth = parseInt(widthInput.value,10);
+    ctx.strokeStyle = colorInput.value;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x,y);
+    ctx.stroke();
+    ctx.restore();
+    lastX = x; lastY = y;
+  }
+  async function pointerUp(e){
+    if(!drawing) return;
+    drawing = false;
+    // store stroke in own session document
+    await endStroke(currentConnectedSession || userId);
+  }
+
+  canvas.addEventListener('mousedown', pointerDown);
+  canvas.addEventListener('mousemove', pointerMove);
+  canvas.addEventListener('mouseup', pointerUp);
+  canvas.addEventListener('mouseleave', pointerUp);
+  // touch
+  canvas.addEventListener('touchstart', pointerDown, {passive:false});
+  canvas.addEventListener('touchmove', pointerMove, {passive:false});
+  canvas.addEventListener('touchend', pointerUp);
+
+  // Tools
+  eraseBtn.addEventListener('click', ()=>{ colorInput.value = '#ffffff'; });
+  undoBtn.addEventListener('click', async ()=>{
+    // local undo: remove last from localStrokes and request server NOT to remove (we can't remove easily arrayUnion items)
+    localStrokes.pop();
+    // redraw local-only (we keep remote strokes from partner)
+    redrawLocalAndRemote();
+  });
+  clearBtn.addEventListener('click', async ()=>{
+    // Clear local canvas and optionally clear own session strokes in firestore
+    const ref = docRefForSession(currentConnectedSession || userId);
+    await ref.set({strokes: []});
+    remoteStrokesMap = {};
+    redrawLocalAndRemote();
+  });
+  exportBtn.addEventListener('click', ()=> {
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a'); a.href = url; a.download = `board_${Date.now()}.png`; a.click();
+  });
+
+  // ---------- Session connect logic ----------
+  let currentPartner = null;
+  let currentConnectedSession = null; // whichever session we're actively sharing with (our session + partner session)
+  joinBtn.addEventListener('click', async ()=>{
+    const pid = partnerInput.value.trim();
+    if(!pid){ alert('Enter partner ID'); return; }
+    if(pid === userId){ alert('Enter a different ID'); return; }
+    currentPartner = pid;
+    // ensure both session docs exist
+    await ensureSessionDoc(userId);
+    await ensureSessionDoc(currentPartner);
+    // start listening to both
+    startListen(userId, strokes => {
+      remoteStrokesMap[userId] = strokes;
+      redrawLocalAndRemote();
     });
+    startListen(currentPartner, strokes => {
+      remoteStrokesMap[currentPartner] = strokes;
+      redrawLocalAndRemote();
+    });
+    connStatus.innerText = `Connected with ${currentPartner}`;
+    currentConnectedSession = userId; // when we draw, we post to our own session doc
+  });
 
-    // Render strokes
-    function renderStrokes(strokes) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      strokes.forEach(stroke => {
-        if (stroke.points && stroke.points.length > 1) {
-          ctx.beginPath();
-          ctx.strokeStyle = stroke.color || '#000';
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
-          ctx.stroke();
-        }
-      });
-    }
+  // create new id quickly
+  createBtn.addEventListener('click', ()=>{
+    userId = generateId();
+    localStorage.setItem('abhi_userid', userId);
+    userIdEl.innerText = userId;
+    connStatus.innerText = 'New ID created';
+  });
 
-    // Session listener
-    let unsubscribe = () => {};
-    function startListening(sessionId) {
-      if (unsubscribe) unsubscribe();
-      const docRef = getSessionDocRef(sessionId);
-      unsubscribe = docRef.onSnapshot((docSnap) => {
-        if (docSnap.exists) {
-          renderStrokes(docSnap.data().strokes || []);
-        }
-      });
-      document.getElementById('status').innerText = `Joined session with User ID: ${sessionId}`;
-    }
+  // listen to your own session only
+  listenSelfBtn.addEventListener('click', async ()=>{
+    await ensureSessionDoc(userId);
+    startListen(userId, strokes => {
+      remoteStrokesMap[userId] = strokes;
+      redrawLocalAndRemote();
+    });
+    connStatus.innerText = `Listening to ${userId}`;
+  });
 
-    // Join partner session
-    document.getElementById('joinButton').addEventListener('click', async () => {
-    const targetIdInput = document.getElementById('targetIdInput').value.trim();
-    if (!targetIdInput || targetIdInput === userId) {
-      showModal("Invalid", "Enter a different User ID.");
+  // When starting a stroke, we already push normalized points to localStrokes.
+  // But we must ensure when ending stroke we upload the normalized coordinates.
+  // (endStroke handles that)
+
+  // ---------- Firestore -> normalizing and drawing ----------
+  // remote strokes are stored as normalized (1000x600). drawStroke handles scaling.
+
+  // ---------- WebRTC screen sharing (simple Firestore signaling) ----------
+  let pc = null;
+  let localStream = null;
+  let callDocRef = null;
+  startShareBtn.addEventListener('click', async ()=>{
+    if(!currentPartner){ alert('Connect to partner first'); return; }
+    startShareBtn.disabled = true;
+    stopShareBtn.disabled = false;
+    // getDisplayMedia
+    try{
+      localStream = await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
+    }catch(err){
+      alert('Screen share permission denied or not supported.');
+      startShareBtn.disabled = false;
+      stopShareBtn.disabled = true;
       return;
     }
 
-    // 👇 Listen to both my session & partner session
-    startListening(userId);
-    startListening(targetIdInput);
+    // create RTCPeerConnection
+    pc = new RTCPeerConnection({
+      iceServers: [{urls:'stun:stun.l.google.com:19302'}]
+    });
 
-    document.getElementById('status').innerText =
-      `Now sharing between ${userId} and ${targetIdInput}`;
+    // add tracks
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    // remote stream
+    const remoteStream = new MediaStream();
+    pc.ontrack = (evt) => {
+      evt.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      remoteVideo.srcObject = remoteStream;
+    };
+
+    // create call doc for signaling under `calls/{callerId}_{calleeId}`
+    const callId = `${userId}_${currentPartner}`;
+    callDocRef = db.collection('calls').doc(callId);
+    const offerCandidates = callDocRef.collection('offerCandidates');
+    const answerCandidates = callDocRef.collection('answerCandidates');
+
+    // collect ICE candidates
+    pc.onicecandidate = (event) => {
+      if(event.candidate){
+        offerCandidates.add(event.candidate.toJSON());
+      }
+    };
+
+    // create offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // store offer in firestore
+    await callDocRef.set({offer: {type: offer.type, sdp: offer.sdp}, caller: userId, callee: currentPartner});
+
+    // listen for answer
+    callDocRef.onSnapshot(async snapshot => {
+      const data = snapshot.data();
+      if(!pc.currentRemoteDescription && data && data.answer){
+        const answer = new RTCSessionDescription(data.answer);
+        await pc.setRemoteDescription(answer);
+      }
+    });
+
+    // listen for remote ICE candidates (answerCandidates)
+    answerCandidates.onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(async change => {
+        if(change.type === 'added'){
+          const c = change.doc.data();
+          try{ await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+        }
+      });
+    });
+
+    // also listen if the callee created a reverse call (callee->caller)
+    // Not implemented complex; here we assume caller initiates and callee watches.
+
+    // Also, allow callee to subscribe to this call by checking call doc with id `${currentPartner}_${userId}`
+    connStatus.innerText = 'Screen share started (offer created).';
+
+    // stop handling when local stream ends
+    localStream.getVideoTracks()[0].onended = () => { stopScreenShare(); };
   });
 
+  // callee side: when someone wants to view your screen, they will read the call doc `${partner}_${yourId}` and respond
+  // We'll implement a watcher to automatically answer any incoming call where callee === userId
+  (function watchIncomingCalls(){
+    const callsCol = db.collection('calls');
+    callsCol.where('callee','==', userId).onSnapshot(snapshot=>{
+      snapshot.docChanges().forEach(async change=>{
+        if(change.type === 'added'){
+          const doc = change.doc;
+          const data = doc.data();
+          // only answer if this user is the callee
+          if(!data || data.callee !== userId) return;
+          const callId = doc.id;
+          // create RTCPeerConnection to receive stream
+          const remoteCallRef = db.collection('calls').doc(callId);
+          const offer = data.offer;
+          const pc2 = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+          const answerCandidates = remoteCallRef.collection('answerCandidates');
+          const offerCandidates = remoteCallRef.collection('offerCandidates');
 
-    // Modal
-    const modal = document.getElementById("modal");
-    const modalClose = document.getElementById("modalClose");
-    function showModal(title, message) {
-      document.getElementById("modalTitle").innerText = title;
-      document.getElementById("modalMessage").innerText = message;
-      modal.style.display = "block";
+          // create remote stream
+          const inboundStream = new MediaStream();
+          pc2.ontrack = (evt)=> {
+            evt.streams[0].getTracks().forEach(t => inboundStream.addTrack(t));
+            remoteVideo.srcObject = inboundStream;
+          };
+
+          // gather local ICE
+          pc2.onicecandidate = (event) => {
+            if(event.candidate){
+              answerCandidates.add(event.candidate.toJSON());
+            }
+          };
+
+          // set remote description (offer)
+          await pc2.setRemoteDescription(new RTCSessionDescription(offer));
+          // create answer
+          const answer = await pc2.createAnswer();
+          await pc2.setLocalDescription(answer);
+          // write answer to call doc
+          await remoteCallRef.update({answer: {type: answer.type, sdp: answer.sdp}});
+
+          // listen for offer ICE candidates to add
+          offerCandidates.onSnapshot(snapshot2=>{
+            snapshot2.docChanges().forEach(async ch=>{
+              if(ch.type === 'added'){
+                const c = ch.doc.data();
+                try{ await pc2.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+              }
+            });
+          });
+
+          connStatus.innerText = `Answered incoming screen-share from ${data.caller}`;
+        }
+      });
+    });
+  })();
+
+  function stopScreenShare(){
+    if(localStream){
+      localStream.getTracks().forEach(t=>t.stop());
+      localStream = null;
     }
-    modalClose.onclick = () => { modal.style.display = "none"; };
-    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+    if(pc){
+      pc.close();
+      pc = null;
+    }
+    startShareBtn.disabled = false;
+    stopShareBtn.disabled = true;
+    connStatus.innerText = 'Screen share stopped.';
+  }
+  stopShareBtn.addEventListener('click', stopScreenShare);
+
+  // ---------- Simple periodic refresh to render local strokes and remote strokes ----------
+  // Because we store normalized coordinates in DB, remote strokes are rendered from remoteStrokesMap
+  // We'll also render localStrokes (the ones user drew during this session) on top.
+  function periodicRender(){
+    // clear
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // draw remote sessions first
+    Object.keys(remoteStrokesMap).forEach(sid=>{
+      const list = remoteStrokesMap[sid]||[];
+      list.forEach(st=>drawStroke(st));
+    });
+    // draw local session strokes from Firestore as well if present
+    const myList = remoteStrokesMap[userId] || [];
+    myList.forEach(st=>drawStroke(st));
+    requestAnimationFrame(periodicRender);
+  }
+  periodicRender();
+
+  // ---------- small helper: when remoteStrokesMap updates, we already redraw via animation frame ----------
+
+  // Ensure we create session doc on load
+  ensureSessionDoc(userId).catch(()=>{});
+
+  // small UX touches
+  partnerInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') joinBtn.click(); });
   </script>
 </body>
 </html>
