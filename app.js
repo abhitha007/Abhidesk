@@ -1,5 +1,5 @@
 // Firebase configuration
-  const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
     authDomain: "abhidesk-d26d0.firebaseapp.com",
     projectId: "abhidesk-d26d0",
@@ -7,8 +7,7 @@
     messagingSenderId: "924205685340",
     appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
     measurementId: "G-ML9D0LTM0D"
-
-    };
+};
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -31,7 +30,6 @@ userIdDisplay.innerText = userId;
 let currentSessionId = null;
 let drawing = false;
 let lastPosition = { x: 0, y: 0 };
-let currentTool = 'pen';
 let unsubscribe = null;
 
 // Drawing context settings
@@ -46,8 +44,8 @@ function resizeCanvas() {
     canvas.width = container.offsetWidth;
     canvas.height = container.offsetHeight;
     if (currentSessionId) {
-        // Re-render strokes on resize to maintain canvas state
-        renderStrokes();
+        // Re-render all existing strokes on resize to maintain canvas state
+        renderAllStrokesFromDB();
     }
 }
 window.addEventListener('resize', resizeCanvas);
@@ -56,8 +54,9 @@ resizeCanvas();
 // Helper to get mouse/touch position
 function getPos(e) {
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.clientX || e.touches[0].clientX;
-    const clientY = e.clientY || e.touches[0].clientY;
+    const clientX = e.clientX || (e.touches ? e.touches[0].clientX : null);
+    const clientY = e.clientY || (e.touches ? e.touches[0].clientY : null);
+    if (clientX === null || clientY === null) return null;
     return {
         x: clientX - rect.left,
         y: clientY - rect.top
@@ -77,6 +76,7 @@ canvas.addEventListener('touchstart', (e) => {
 canvas.addEventListener('mousemove', (e) => {
     if (!drawing || !currentSessionId) return;
     const newPosition = getPos(e);
+    if (!newPosition) return;
 
     const stroke = {
         startX: lastPosition.x,
@@ -95,6 +95,7 @@ canvas.addEventListener('touchmove', (e) => {
     if (!drawing || !currentSessionId) return;
     e.preventDefault();
     const newPosition = getPos(e);
+    if (!newPosition) return;
 
     const stroke = {
         startX: lastPosition.x,
@@ -113,17 +114,23 @@ canvas.addEventListener('touchmove', (e) => {
 window.addEventListener('mouseup', () => { drawing = false; });
 window.addEventListener('touchend', () => { drawing = false; });
 
-// Render strokes from Firestore
-let allStrokes = [];
-function renderStrokes() {
+// Render a single stroke
+function renderSingleStroke(stroke) {
+    ctx.beginPath();
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.lineWidth;
+    ctx.moveTo(stroke.startX, stroke.startY);
+    ctx.lineTo(stroke.endX, stroke.endY);
+    ctx.stroke();
+}
+
+// Render all strokes from the database
+async function renderAllStrokesFromDB() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    allStrokes.forEach(stroke => {
-        ctx.beginPath();
-        ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = stroke.lineWidth;
-        ctx.moveTo(stroke.startX, stroke.startY);
-        ctx.lineTo(stroke.endX, stroke.endY);
-        ctx.stroke();
+    if (!currentSessionId) return;
+    const snapshot = await db.collection("sessions").doc(currentSessionId).collection("strokes").orderBy("timestamp").get();
+    snapshot.docs.forEach(doc => {
+        renderSingleStroke(doc.data());
     });
 }
 
@@ -131,6 +138,7 @@ function renderStrokes() {
 async function joinSession(sessionId) {
     if (unsubscribe) unsubscribe();
     currentSessionId = sessionId;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const sessionRef = db.collection("sessions").doc(sessionId);
     const doc = await sessionRef.get();
@@ -140,12 +148,18 @@ async function joinSession(sessionId) {
         });
     }
 
-    // Set up a real-time listener for all strokes in the session
+    // Set up a real-time listener for new strokes
     unsubscribe = sessionRef.collection("strokes")
         .orderBy("timestamp")
         .onSnapshot(snapshot => {
-            allStrokes = snapshot.docs.map(doc => doc.data());
-            renderStrokes();
+            snapshot.docChanges().forEach(change => {
+                if (change.type === "added") {
+                    renderSingleStroke(change.doc.data());
+                } else if (change.type === "removed") {
+                    // Re-render the entire canvas if strokes are deleted
+                    renderAllStrokesFromDB();
+                }
+            });
         }, error => {
             console.error("Error listening for strokes:", error);
             alert("Error joining session. Please check your network and try again.");
@@ -162,7 +176,6 @@ function leaveSession() {
     if (unsubscribe) unsubscribe();
     currentSessionId = null;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    allStrokes = [];
     currentRoomDisplay.innerText = 'Not joined';
     sessionIdInput.disabled = false;
     sessionIdInput.value = '';
@@ -183,7 +196,6 @@ joinButton.addEventListener('click', () => {
 leaveButton.addEventListener('click', leaveSession);
 
 colorPicker.addEventListener('change', (e) => {
-    currentTool = 'pen';
     ctx.strokeStyle = e.target.value;
 });
 
@@ -192,7 +204,6 @@ brushSizeSlider.addEventListener('input', (e) => {
 });
 
 eraserButton.addEventListener('click', () => {
-    currentTool = 'eraser';
     ctx.strokeStyle = '#FFFFFF'; // Eraser color
     ctx.lineWidth = 20; // Eraser size
 });
