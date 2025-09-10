@@ -31,6 +31,7 @@ let currentSessionId = null;
 let drawing = false;
 let lastPosition = { x: 0, y: 0 };
 let unsubscribe = null;
+let allStrokes = []; // This will hold the local cache of all strokes
 
 // Drawing context settings
 ctx.lineWidth = brushSizeSlider.value;
@@ -44,8 +45,7 @@ function resizeCanvas() {
     canvas.width = container.offsetWidth;
     canvas.height = container.offsetHeight;
     if (currentSessionId) {
-        // Re-render all existing strokes on resize to maintain canvas state
-        renderAllStrokesFromDB();
+        renderStrokesFromCache();
     }
 }
 window.addEventListener('resize', resizeCanvas);
@@ -77,7 +77,8 @@ canvas.addEventListener('mousemove', (e) => {
     if (!drawing || !currentSessionId) return;
     const newPosition = getPos(e);
     if (!newPosition) return;
-
+    
+    // Create the stroke data
     const stroke = {
         startX: lastPosition.x,
         startY: lastPosition.y,
@@ -88,9 +89,13 @@ canvas.addEventListener('mousemove', (e) => {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
+    // Add stroke to Firestore
     db.collection("sessions").doc(currentSessionId).collection("strokes").add(stroke);
+    
+    // Update lastPosition for the next point
     lastPosition = newPosition;
 });
+
 canvas.addEventListener('touchmove', (e) => {
     if (!drawing || !currentSessionId) return;
     e.preventDefault();
@@ -107,30 +112,26 @@ canvas.addEventListener('touchmove', (e) => {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
+    // Add stroke to Firestore
     db.collection("sessions").doc(currentSessionId).collection("strokes").add(stroke);
+    
+    // Update lastPosition for the next point
     lastPosition = newPosition;
 }, { passive: false });
 
 window.addEventListener('mouseup', () => { drawing = false; });
 window.addEventListener('touchend', () => { drawing = false; });
 
-// Render a single stroke
-function renderSingleStroke(stroke) {
-    ctx.beginPath();
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.lineWidth;
-    ctx.moveTo(stroke.startX, stroke.startY);
-    ctx.lineTo(stroke.endX, stroke.endY);
-    ctx.stroke();
-}
-
-// Render all strokes from the database
-async function renderAllStrokesFromDB() {
+// Render all strokes from the local cache
+function renderStrokesFromCache() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!currentSessionId) return;
-    const snapshot = await db.collection("sessions").doc(currentSessionId).collection("strokes").orderBy("timestamp").get();
-    snapshot.docs.forEach(doc => {
-        renderSingleStroke(doc.data());
+    allStrokes.forEach(stroke => {
+        ctx.beginPath();
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.lineWidth;
+        ctx.moveTo(stroke.startX, stroke.startY);
+        ctx.lineTo(stroke.endX, stroke.endY);
+        ctx.stroke();
     });
 }
 
@@ -138,28 +139,28 @@ async function renderAllStrokesFromDB() {
 async function joinSession(sessionId) {
     if (unsubscribe) unsubscribe();
     currentSessionId = sessionId;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    allStrokes = []; // Clear the local cache for the new session
+    renderStrokesFromCache(); // Clear the canvas
 
     const sessionRef = db.collection("sessions").doc(sessionId);
     const doc = await sessionRef.get();
     if (!doc.exists) {
-        await sessionRef.set({ 
-            created: firebase.firestore.FieldValue.serverTimestamp() 
-        });
+        await sessionRef.set({ created: firebase.firestore.FieldValue.serverTimestamp() });
     }
 
-    // Set up a real-time listener for new strokes
+    // Set up a real-time listener for all changes
     unsubscribe = sessionRef.collection("strokes")
         .orderBy("timestamp")
         .onSnapshot(snapshot => {
             snapshot.docChanges().forEach(change => {
+                const strokeData = change.doc.data();
                 if (change.type === "added") {
-                    renderSingleStroke(change.doc.data());
+                    allStrokes.push(strokeData);
                 } else if (change.type === "removed") {
-                    // Re-render the entire canvas if strokes are deleted
-                    renderAllStrokesFromDB();
+                    allStrokes = allStrokes.filter(stroke => stroke.timestamp.isEqual(strokeData.timestamp) === false);
                 }
             });
+            renderStrokesFromCache();
         }, error => {
             console.error("Error listening for strokes:", error);
             alert("Error joining session. Please check your network and try again.");
@@ -175,6 +176,7 @@ async function joinSession(sessionId) {
 function leaveSession() {
     if (unsubscribe) unsubscribe();
     currentSessionId = null;
+    allStrokes = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     currentRoomDisplay.innerText = 'Not joined';
     sessionIdInput.disabled = false;
