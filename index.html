@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Drawing Collaboration</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 0; }
+    #canvasContainer { position: relative; width: 100%; height: 80vh; }
+    canvas { border: 1px solid #333; display: block; margin: auto; touch-action: none; }
+    #controls { margin: 10px; }
+    #userIdDisplay { font-weight: bold; color: blue; }
+    #status { margin-top: 5px; color: green; }
+    #joinButton { margin-left: 10px; }
+    #modal { display: none; position: fixed; z-index: 100; padding-top: 100px;
+             left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);}
+    #modalContent { background: #fff; margin: auto; padding: 20px; width: 80%; max-width: 400px; border-radius: 5px;}
+    #modalClose { float: right; cursor: pointer; font-size: 20px;}
+  </style>
+</head>
+<body>
+  <h2>Realtime Drawing Board</h2>
+  <p>Your User ID: <span id="userIdDisplay">...</span></p>
+
+  <div id="controls">
+    <input type="text" id="targetIdInput" placeholder="Enter partner's User ID">
+    <button id="joinButton">Join Session</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="canvasContainer">
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal">
+    <div id="modalContent">
+      <span id="modalClose">&times;</span>
+      <h3 id="modalTitle"></h3>
+      <p id="modalMessage"></p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+      authDomain: "abhidesk-d26d0.firebaseapp.com",
+      projectId: "abhidesk-d26d0",
+      storageBucket: "abhidesk-d26d0.appspot.com",
+      messagingSenderId: "924205685340",
+      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
+      measurementId: "G-ML9D0LTM0D"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let userId;
+    const initialAuthToken = null;
+
+    function getSessionDocRef(sessionId) {
+      return doc(db, "sessions", sessionId);  // ✅ Fixed
+    }
+
+    async function ensureSession(uid) {
+      const docRef = getSessionDocRef(uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, { strokes: [] });
+        console.log("New session created for", uid);
+      }
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        userId = user.uid;
+        document.getElementById('userIdDisplay').innerText = userId;
+        await ensureSession(userId);
+      } else {
+        if (initialAuthToken) {
+          await signInWithCustomToken(auth, initialAuthToken);
+        } else {
+          await signInAnonymously(auth);
+        }
+      }
+    });
+
+    // 🎨 Drawing logic
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000';
+
+    let drawing = false;
+    let currentStroke = { color: ctx.strokeStyle, points: [] };
+    let lastX, lastY;
+
+    function draw(x, y) {
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x;
+      lastY = y;
+      currentStroke.points.push({ x, y });
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      drawing = true;
+      lastX = e.offsetX;
+      lastY = e.offsetY;
+      currentStroke = { color: ctx.strokeStyle, points: [{ x: lastX, y: lastY }] };
+    });
+
+    canvas.addEventListener('mousemove', (e) => { if (drawing) draw(e.offsetX, e.offsetY); });
+
+    canvas.addEventListener('mouseup', async () => {
+      drawing = false;
+      if (currentStroke.points.length > 0) {
+        const docRef = getSessionDocRef(userId);
+        await updateDoc(docRef, { strokes: arrayUnion(currentStroke) })
+          .catch(async () => { await setDoc(docRef, { strokes: [currentStroke] }); });
+        currentStroke = { color: ctx.strokeStyle, points: [] };
+      }
+    });
+
+    // Touch
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+      drawing = true;
+      lastX = x;
+      lastY = y;
+      currentStroke = { color: ctx.strokeStyle, points: [{ x, y }] };
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!drawing) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+      draw(x, y);
+    });
+
+    canvas.addEventListener('touchend', async () => {
+      drawing = false;
+      if (currentStroke.points.length > 0) {
+        const docRef = getSessionDocRef(userId);
+        await updateDoc(docRef, { strokes: arrayUnion(currentStroke) })
+          .catch(async () => { await setDoc(docRef, { strokes: [currentStroke] }); });
+        currentStroke = { color: ctx.strokeStyle, points: [] };
+      }
+    });
+
+    // Render strokes from Firestore
+    function renderStrokes(strokes) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      strokes.forEach(stroke => {
+        if (stroke.points && stroke.points.length > 1) {
+          ctx.beginPath();
+          ctx.strokeStyle = stroke.color || '#000';
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          stroke.points.forEach(p => ctx.lineTo(p.x, p.y));
+          ctx.stroke();
+        }
+      });
+    }
+
+    // Listen for changes
+    let unsubscribe = () => {};
+    function startListening(sessionId) {
+      if (unsubscribe) unsubscribe();
+      const docRef = getSessionDocRef(sessionId);
+      unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) renderStrokes(docSnap.data().strokes || []);
+      });
+      document.getElementById('status').innerText = `Joined session with User ID: ${sessionId}`;
+    }
+
+    // Join button
+    document.getElementById('joinButton').addEventListener('click', async () => {
+      if (!userId) { showModal("Not Ready", "Please wait for authentication."); return; }
+      const targetIdInput = document.getElementById('targetIdInput').value.trim();
+      if (!targetIdInput || targetIdInput === userId) {
+        showModal("Invalid", "Enter a different User ID."); return;
+      }
+      const docRef = getSessionDocRef(targetIdInput);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) { startListening(targetIdInput); }
+      else { showModal("Session Not Found", "Partner’s session doesn’t exist yet."); }
+    });
+
+    // Modal
+    const modal = document.getElementById("modal");
+    const modalClose = document.getElementById("modalClose");
+    function showModal(title, message) {
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalMessage").innerText = message;
+      modal.style.display = "block";
+    }
+    modalClose.onclick = () => { modal.style.display = "none"; };
+    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+  </script>
+</body>
+</html>
