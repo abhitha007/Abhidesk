@@ -3,24 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <title>Realtime Drawing Board</title>
+  <style>
+    canvas { border:1px solid black; cursor: crosshair; }
+  </style>
 </head>
 <body>
   <h2>Realtime Drawing Board</h2>
   <p>Your User ID: <span id="userId">...</span></p>
   <input type="text" id="partnerId" placeholder="Enter partner's User ID">
   <button onclick="joinSession()">Join Session</button>
-  <canvas id="board" width="800" height="600" style="border:1px solid black"></canvas>
+  <br><br>
+  <canvas id="board" width="800" height="500"></canvas>
 
-  <!-- Firebase App (Core SDK) -->
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js"></script>
-  <!-- Firebase Database -->
   <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"></script>
 
   <script>
-    // Your Firebase config
+    // ✅ Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
       authDomain: "abhidesk-d26d0.firebaseapp.com",
+      databaseURL: "https://abhidesk-d26d0-default-rtdb.asia-southeast1.firebasedatabase.app", 
       projectId: "abhidesk-d26d0",
       storageBucket: "abhidesk-d26d0.appspot.com",
       messagingSenderId: "924205685340",
@@ -28,15 +32,62 @@
       measurementId: "G-ML9D0LTM0D"
     };
 
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
+    // ✅ Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Example: show user id
-    const userId = Math.random().toString(36).substring(2, 10);
+    // ✅ User + Session IDs
+    const userId = Math.random().toString(36).substring(2, 8);
     document.getElementById("userId").innerText = userId;
+    let partnerId = null;
 
-    // TODO: Add your drawing + syncing logic here...
+    // ✅ Canvas setup
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    let drawing = false;
+
+    canvas.addEventListener("mousedown", () => { drawing = true; });
+    canvas.addEventListener("mouseup", () => { drawing = false; ctx.beginPath(); });
+    canvas.addEventListener("mousemove", draw);
+
+    function draw(e) {
+      if (!drawing) return;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "black";
+
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+
+      if (partnerId) {
+        db.ref(`sessions/${partnerId}/drawings`).push({
+          x: e.offsetX,
+          y: e.offsetY
+        });
+      }
+    }
+
+    // ✅ Join session with partner
+    function joinSession() {
+      partnerId = document.getElementById("partnerId").value.trim();
+      if (!partnerId) { alert("Enter partner ID"); return; }
+
+      // Listen for partner's drawings
+      db.ref(`sessions/${userId}/drawings`).on("child_added", (snap) => {
+        const {x, y} = snap.val();
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "red";
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      });
+
+      alert(`Joined session with ${partnerId}`);
+    }
   </script>
 </body>
 </html>
