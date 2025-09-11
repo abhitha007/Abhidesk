@@ -1,215 +1,358 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>AbhiDesk — Screen Share Only</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-    :root{
-      --bg:#1a1f30;--accent:#e60073;--secondary:#00aaff;--muted:#b0b6c6;
-      --glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.1)
-    }
-    *{box-sizing:border-box;}
-    body{margin:0;font-family:'Poppins',sans-serif;
-      background:linear-gradient(180deg,#101420,#161a2b);
-      color:#e6eef6;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
-    header{display:flex;justify-content:space-between;align-items:center;
-      padding:16px;border-bottom:1px solid var(--border);flex-shrink:0;}
-    h1{font-weight:700;color:var(--accent);margin:0;}
-    .user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;
-      color:var(--secondary);font-weight:600;border:1px solid var(--border)}
-    .controls{display:flex;gap:12px;align-items:center;padding:12px;
-      border-bottom:1px solid var(--border);flex-shrink:0;}
-    input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);
-      background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
-    button{background:var(--accent);color:#fff;border:0;padding:10px 18px;
-      border-radius:10px;cursor:pointer;font-weight:600;}
-    button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
-    .main{flex:1;display:flex;flex-direction:column;align-items:center;
-      justify-content:center;padding:20px;position:relative;}
-    video{width:90%;max-width:1000px;height:100;border-radius:12px;background:#000;
-      border:1px solid var(--border);transition:all 0.3s ease;}
-    .status{margin-top:10px;color:var(--muted);}
-    .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);
-      border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;
-      transform:translate(-50%,-50%);z-index:1000;text-align:center;}
-    /* fullscreen mode */
-    .fullscreen-mode header,
-    .fullscreen-mode .controls,
-    .fullscreen-mode .status{display:none;}
-    .fullscreen-mode .main{padding:0;}
-    .fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
-    /* fullscreen toggle button */
-    #fullscreenBtn{
-      position:absolute;bottom:20px;right:20px;
-      background:rgba(0,0,0,0.5);border:none;
-      border-radius:50%;width:48px;height:48px;
-      display:flex;align-items:center;justify-content:center;
-      cursor:pointer;color:#fff;font-size:20px;
-    }
-  </style>
+<meta charset="utf-8" />
+<title>AbhiDesk — Screen Share Only</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+:root{
+  --bg:#1a1f30;
+  --accent:#e60073;
+  --secondary:#00aaff;
+  --muted:#b0b6c6;
+  --glass:rgba(255,255,255,0.05);
+  --border:rgba(255,255,255,0.1);
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:'Poppins',sans-serif;
+  background:linear-gradient(180deg,#101420,#161a2b);
+  color:#e6eef6;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:16px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+
+h1{
+  font-weight:700;
+  color:var(--accent);
+  margin:0;
+}
+
+.user-pill{
+  background:var(--glass);
+  padding:6px 14px;
+  border-radius:999px;
+  color:var(--secondary);
+  font-weight:600;
+  border:1px solid var(--border);
+}
+
+.controls{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:12px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  flex-wrap:wrap;
+}
+
+input[type=text]{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(0,0,0,0.2);
+  color:inherit;
+  min-width:240px;
+}
+
+button{
+  background:var(--accent);
+  color:#fff;
+  border:0;
+  padding:10px 18px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:600;
+  transition:all 0.2s ease;
+}
+
+button:hover{opacity:0.85;}
+button.ghost{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--muted);
+}
+
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  position:relative;
+  overflow-y:auto;
+}
+
+video{
+  width:90%;
+  max-width:1000px;
+  height:auto;
+  aspect-ratio:16/9;
+  border-radius:12px;
+  background:#000;
+  border:1px solid var(--border);
+  transition:all 0.3s ease;
+}
+
+.status{
+  margin-top:10px;
+  color:var(--muted);
+  text-align:center;
+}
+
+.notification{
+  background:rgba(255,255,255,0.1);
+  backdrop-filter:blur(10px);
+  border-radius:12px;
+  padding:16px;
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:1000;
+  text-align:center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s ease;
+}
+
+.notification.show{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* fullscreen mode */
+.fullscreen-mode header,
+.fullscreen-mode .controls,
+.fullscreen-mode .status{display:none;}
+.fullscreen-mode .main{padding:0;}
+.fullscreen-mode video{
+  width:100%;
+  height:100%;
+  max-width:none;
+  border-radius:0;
+}
+
+/* fullscreen toggle button */
+#fullscreenBtn{
+  position:absolute;
+  bottom:20px;
+  right:20px;
+  background:rgba(0,0,0,0.5);
+  border:none;
+  border-radius:50%;
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  color:#fff;
+  font-size:20px;
+  transition:all 0.2s ease;
+}
+#fullscreenBtn:hover{background:rgba(0,0,0,0.7);}
+</style>
 </head>
 <body>
-  <header>
-    <h1>AbhiDesk 🚀</h1>
-    <div class="user-pill">Your ID: <span id="userId">...</span></div>
-  </header>
 
-  <div class="controls">
-    <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
-    <button id="inviteBtn">Invite</button>
-    <button id="createBtn" class="ghost">New ID</button>
-    <div id="connStatus" class="status">Ready to connect...</div>
-  </div>
+<header>
+  <h1>AbhiDesk 🚀</h1>
+  <div class="user-pill">Your ID: <span id="userId">...</span></div>
+</header>
 
-  <div class="main">
-    <video id="remoteVideo" autoplay playsinline></video>
-    <div id="debugLog" class="status">Waiting for connection...</div>
-    <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
-  </div>
+<div class="controls">
+  <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
+  <button id="inviteBtn">Invite</button>
+  <button id="createBtn" class="ghost">New ID</button>
+  <div id="connStatus" class="status">Ready to connect...</div>
+</div>
 
-  <div id="inviteNotification" class="notification" style="display:none;">
-    <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
-    <button id="acceptInvite">Accept</button>
-    <button id="declineInvite" class="ghost">Decline</button>
-  </div>
+<div class="main">
+  <video id="remoteVideo" autoplay playsinline></video>
+  <div id="debugLog" class="status">Waiting for connection...</div>
+  <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
+</div>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<div id="inviteNotification" class="notification">
+  <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
+  <button id="acceptInvite">Accept</button>
+  <button id="declineInvite" class="ghost">Decline</button>
+</div>
 
-  <script>
-    // ---------------- CONFIG ----------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
-      authDomain: "abhidesk-d26d0.firebaseapp.com",
-      projectId: "abhidesk-d26d0",
-      storageBucket: "abhidesk-d26d0.appspot.com",
-      messagingSenderId: "924205685340",
-      appId: "1:924205685340:web:b33b4dfa2be1da2696a499"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    // ---------------- STATE ----------------
-    const userIdEl = document.getElementById('userId');
-    function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
-    let userId = localStorage.getItem('abhi_userid') || generateId();
-    localStorage.setItem('abhi_userid', userId);
-    userIdEl.innerText = userId;
+<script>
+// ---------------- CONFIG ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
+  authDomain: "abhidesk-d26d0.firebaseapp.com",
+  projectId: "abhidesk-d26d0",
+  storageBucket: "abhidesk-d26d0.appspot.com",
+  messagingSenderId: "924205685340",
+  appId: "1:924205685340:web:b33b4dfa2be1da2696a499"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-    const partnerInput = document.getElementById('partnerId');
-    const inviteBtn = document.getElementById('inviteBtn');
-    const createBtn = document.getElementById('createBtn');
-    const connStatus = document.getElementById('connStatus');
-    const debugLogEl = document.getElementById('debugLog');
-    const remoteVideo = document.getElementById('remoteVideo');
+// ---------------- STATE ----------------
+const userIdEl = document.getElementById('userId');
+function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
+let userId = localStorage.getItem('abhi_userid') || generateId();
+localStorage.setItem('abhi_userid', userId);
+userIdEl.innerText = userId;
 
-    const inviteNotificationEl = document.getElementById('inviteNotification');
-    const inviteUserEl = document.getElementById('inviteUser');
-    const acceptInviteBtn = document.getElementById('acceptInvite');
-    const declineInviteBtn = document.getElementById('declineInvite');
+const partnerInput = document.getElementById('partnerId');
+const inviteBtn = document.getElementById('inviteBtn');
+const createBtn = document.getElementById('createBtn');
+const connStatus = document.getElementById('connStatus');
+const debugLogEl = document.getElementById('debugLog');
+const remoteVideo = document.getElementById('remoteVideo');
 
-    let sessionId=null, partnerId=null, isHost=false;
+const inviteNotificationEl = document.getElementById('inviteNotification');
+const inviteUserEl = document.getElementById('inviteUser');
+const acceptInviteBtn = document.getElementById('acceptInvite');
+const declineInviteBtn = document.getElementById('declineInvite');
 
-    function updateStatus(txt){connStatus.innerText=txt;debugLogEl.innerText=txt;}
+let sessionId=null, partnerId=null, isHost=false;
 
-    // ---------------- INVITE ----------------
-    inviteBtn.addEventListener('click', async()=>{
-      const pid=partnerInput.value.trim();
-      if(!pid||pid===userId){alert("Enter valid partner ID");return;}
-      partnerId=pid;isHost=true;
-      sessionId=`${userId}_${partnerId}_${Date.now()}`;
-      await db.collection("invites").doc(partnerId).set({
-        senderId:userId,sessionId,timestamp:firebase.firestore.FieldValue.serverTimestamp(),status:"pending"
-      });
-      updateStatus("Invitation sent — waiting...");
+function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
+
+// ---------------- INVITE ----------------
+inviteBtn.addEventListener('click', async()=>{
+  const pid = partnerInput.value.trim();
+  if(!pid || pid===userId){alert("Enter valid partner ID"); return;}
+  partnerId = pid;
+  isHost = true;
+  sessionId = `${userId}_${partnerId}_${Date.now()}`;
+  await db.collection("invites").doc(partnerId).set({
+    senderId:userId,
+    sessionId,
+    timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+    status:"pending"
+  });
+  updateStatus("Invitation sent — waiting...");
+});
+
+createBtn.addEventListener('click', ()=>{
+  userId = generateId();
+  localStorage.setItem('abhi_userid', userId);
+  userIdEl.innerText = userId;
+  updateStatus("New ID ready.");
+});
+
+// Listen for incoming invites
+db.collection("invites").doc(userId).onSnapshot(snap=>{
+  const data=snap.data();
+  if(data && data.status==="pending"){
+    inviteUserEl.innerText=data.senderId;
+    inviteNotificationEl.classList.add("show");
+    sessionId=data.sessionId;
+    partnerId=data.senderId;
+    isHost=false;
+  }else{
+    inviteNotificationEl.classList.remove("show");
+  }
+});
+
+// ---------------- ACCEPT / DECLINE ----------------
+acceptInviteBtn.addEventListener("click", async()=>{
+  inviteNotificationEl.classList.remove("show");
+  if(!sessionId) return;
+  await db.collection("invites").doc(userId).delete();
+  updateStatus("Starting screen share...");
+  startScreenShareAsGuest(sessionId, partnerId, userId);
+});
+declineInviteBtn.addEventListener("click", async()=>{
+  inviteNotificationEl.classList.remove("show");
+  await db.collection("invites").doc(userId).delete();
+  updateStatus("Invitation declined.");
+});
+
+// ---------------- WEBRTC ----------------
+async function startScreenShareAsGuest(sessionId, callerId, calleeId){
+  let pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getDisplayMedia({video:true});
+  } catch(err) {
+    updateStatus("Screen sharing denied: " + err.message);
+    return;
+  }
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  const callRef = db.collection("calls").doc(sessionId);
+  const offerCandidates = callRef.collection("offerCandidates");
+  const answerCandidates = callRef.collection("answerCandidates");
+
+  pc.onicecandidate = e => { if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await callRef.set({offer:{type:offer.type,sdp:offer.sdp},caller:callerId,callee:calleeId});
+
+  callRef.onSnapshot(async snap=>{
+    const data = snap.data();
+    if(data && data.answer && !pc.currentRemoteDescription){
+      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    }
+  });
+  offerCandidates.onSnapshot(snap=>{
+    snap.docChanges().forEach(async ch=>{
+      if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
     });
+  });
+  updateStatus("Screen sharing started!");
+}
 
-    createBtn.addEventListener('click', ()=>{
-      userId=generateId();localStorage.setItem('abhi_userid',userId);
-      userIdEl.innerText=userId;updateStatus("New ID ready.");
-    });
-
-    // Listen for incoming invites
-    db.collection("invites").doc(userId).onSnapshot(async snap=>{
-      const data=snap.data();
-      if(data&&data.status==="pending"){
-        inviteUserEl.innerText=data.senderId;
-        inviteNotificationEl.style.display="block";
-        sessionId=data.sessionId;partnerId=data.senderId;isHost=false;
-      }else{inviteNotificationEl.style.display="none";}
-    });
-
-    // ---------------- ACCEPT / DECLINE ----------------
-    acceptInviteBtn.addEventListener("click",async()=>{
-      inviteNotificationEl.style.display="none";
-      if(!sessionId)return;
-      await db.collection("invites").doc(userId).delete();
-      updateStatus("Starting screen share...");
-      startScreenShareAsGuest(sessionId,partnerId,userId);
-    });
-    declineInviteBtn.addEventListener("click",async()=>{
-      inviteNotificationEl.style.display="none";
-      await db.collection("invites").doc(userId).delete();
-      updateStatus("Invitation declined.");
-    });
-
-    // ---------------- WEBRTC ----------------
-    async function startScreenShareAsGuest(sessionId,callerId,calleeId){
-      let pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-      let localStream=await navigator.mediaDevices.getDisplayMedia({video:true});
-      localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-
-      const callRef=db.collection("calls").doc(sessionId);
-      const offerCandidates=callRef.collection("offerCandidates");
-      const answerCandidates=callRef.collection("answerCandidates");
-      pc.onicecandidate=e=>{if(e.candidate)answerCandidates.add(e.candidate.toJSON());};
-
-      const offer=await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await callRef.set({offer:{type:offer.type,sdp:offer.sdp},caller:callerId,callee:calleeId});
-
-      callRef.onSnapshot(async snap=>{
-        const data=snap.data();
-        if(data&&data.answer&&!pc.currentRemoteDescription){
-          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-      });
-      offerCandidates.onSnapshot(snap=>{
-        snap.docChanges().forEach(async ch=>{
-          if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
+// Host receives remote screen
+db.collection("calls").onSnapshot(snap=>{
+  snap.docChanges().forEach(async change=>{
+    if(change.type==="added" && isHost && change.doc.id.includes(userId)){
+      const data = change.doc.data();
+      const pc2 = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      const inbound = new MediaStream();
+      pc2.ontrack = ev => { ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
+      const ansCand = change.doc.ref.collection("answerCandidates");
+      const offCand = change.doc.ref.collection("offerCandidates");
+      pc2.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
+      await pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const ans = await pc2.createAnswer(); await pc2.setLocalDescription(ans);
+      await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
+      ansCand.onSnapshot(ss=>{
+        ss.docChanges().forEach(async ch=>{
+          if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
         });
       });
-      updateStatus("Screen sharing started!");
+      updateStatus("Receiving partner screen...");
     }
+  });
+});
 
-    // Host listens for remote screen
-    db.collection("calls").onSnapshot(snap=>{
-      snap.docChanges().forEach(async change=>{
-        if(change.type==="added" && isHost && change.doc.id.includes(userId)){
-          const data=change.doc.data();
-          const pc2=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-          const inbound=new MediaStream();
-          pc2.ontrack=(ev)=>{ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t));remoteVideo.srcObject=inbound;};
-          const ansCand=change.doc.ref.collection("answerCandidates");
-          const offCand=change.doc.ref.collection("offerCandidates");
-          pc2.onicecandidate=e=>{if(e.candidate)offCand.add(e.candidate.toJSON());};
-          await pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
-          const ans=await pc2.createAnswer();await pc2.setLocalDescription(ans);
-          await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
-          ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}})});
-          updateStatus("Receiving partner screen...");
-        }
-      });
-    });
-
-    // ---------------- FULLSCREEN TOGGLE ----------------
-    const fullscreenBtn=document.getElementById("fullscreenBtn");
-    fullscreenBtn.addEventListener("click",()=>{
-      document.body.classList.toggle("fullscreen-mode");
-    });
-  </script>
+// ---------------- FULLSCREEN TOGGLE ----------------
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+fullscreenBtn.addEventListener("click", ()=>{
+  document.body.classList.toggle("fullscreen-mode");
+});
+</script>
 </body>
 </html>
