@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>AbhiDesk — Realtime Drawing + Screen Share</title>
+    <title>AbhiDesk — Realtime Drawing + Screen Share (Fixed)</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -111,6 +111,7 @@
         </div>
     </div>
 
+    <!-- Firebase Compat SDKs (we're using compat API surface for simplicity) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
@@ -148,7 +149,6 @@
     const eraseBtn = document.getElementById('eraseBtn');
     const clearBtn = document.getElementById('clearBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const undoBtn = document.getElementById('undoBtn');
 
     const startShareBtn = document.getElementById('startShare');
     const stopShareBtn = document.getElementById('stopShare');
@@ -160,7 +160,8 @@
     const declineInviteBtn = document.getElementById('declineInvite');
 
     // CORE STATE
-    let remoteStrokesMap = {};
+    let sessionStrokesCache = []; // local cache of strokes for the active session
+    let remoteStrokesMap = {}; // kept for backwards compatibility if needed
     let currentStroke = null;
     let drawing = false, lastX = 0, lastY = 0;
     let partnerId = null;
@@ -175,6 +176,7 @@
     function updateStatus(text, isError = false) {
         connStatus.innerText = text;
         connStatus.style.color = isError ? '#ff4d4f' : 'var(--muted)';
+        debugLogEl.innerText = text;
     }
 
     function setDrawingMode(isAllowed) {
@@ -214,9 +216,18 @@
         const aspect = 1000 / 600;
         canvas.width = parentWidth;
         canvas.height = Math.round(parentWidth / aspect);
+        // redraw existing strokes after resize
+        redrawAll();
     }
     window.addEventListener('resize', fitCanvas);
     fitCanvas();
+
+    function redrawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (sessionStrokesCache && sessionStrokesCache.length) {
+            sessionStrokesCache.forEach(st => drawStroke(st));
+        }
+    }
 
     function toNormalized(x, y) {
         const nx = Math.round((x / canvas.width) * 1000);
@@ -227,7 +238,9 @@
     function drawStroke(st) {
         if (!st || !st.points || st.points.length === 0) return;
         ctx.save();
-        ctx.lineWidth = st.width || 2;
+        // Respect stroke width but scale proportionally to canvas width
+        const scaleFactor = (canvas.width / 1000 + canvas.height / 600) / 2;
+        ctx.lineWidth = (st.width || 2) * scaleFactor;
         ctx.strokeStyle = st.color || '#000';
         ctx.beginPath();
         ctx.moveTo(st.points[0].x * (canvas.width / 1000), st.points[0].y * (canvas.height / 600));
@@ -282,27 +295,41 @@
         currentStroke = null;
     }
 
-    canvas.addEventListener('mousedown', pointerDown);
-    canvas.addEventListener('mousemove', pointerMove);
-    canvas.addEventListener('mouseup', pointerUp);
-    canvas.addEventListener('mouseleave', pointerUp);
-    canvas.addEventListener('touchstart', pointerDown, { passive: false });
-    canvas.addEventListener('touchmove', pointerMove, { passive: false });
-    canvas.addEventListener('touchend', pointerUp);
-
     // ------------------ FIRESTORE & SESSION LOGIC ------------------
     async function startListeningForStrokes() {
         if (!sessionId || hostStrokesListener) return;
         const ref = db.collection('sessions').doc(sessionId);
+        sessionStrokesCache = [];
         hostStrokesListener = ref.onSnapshot(docSnap => {
             if (!docSnap.exists) {
-                remoteStrokesMap[sessionId] = [];
+                sessionStrokesCache = [];
+                redrawAll();
                 return;
             }
             const data = docSnap.data() || {};
-            remoteStrokesMap[sessionId] = data.strokes || [];
-            if (isHost && data.strokes && data.strokes.length > 0) {
-                // Ensure local strokes are in sync if needed, though this is primarily for guest.
+            const strokes = data.strokes || [];
+
+            // Handle clear / reset
+            if (!strokes.length && sessionStrokesCache.length) {
+                sessionStrokesCache = [];
+                redrawAll();
+            }
+
+            // If new strokes were appended, draw only the new ones
+            if (strokes.length > sessionStrokesCache.length) {
+                for (let i = sessionStrokesCache.length; i < strokes.length; i++) {
+                    drawStroke(strokes[i]);
+                }
+                sessionStrokesCache = strokes.slice();
+            }
+
+            // Update status if session status changed
+            if (data.status) {
+                if (data.status === 'active') {
+                    updateStatus('Session active — connected.');
+                } else {
+                    updateStatus('Session: ' + data.status);
+                }
             }
         }, err => {
             console.error('onSnapshot error:', err);
@@ -316,21 +343,23 @@
             hostStrokesListener();
             hostStrokesListener = null;
         }
-        remoteStrokesMap = {};
+        sessionStrokesCache = [];
     }
 
-    async function createNewSession(partnerId, status) {
-        const id = `${userId}_${partnerId}_${Date.now()}`;
+    async function createNewSession(partnerIdParam, status) {
+        const id = `${userId}_${partnerIdParam}_${Date.now()}`;
         try {
             const sessionRef = db.collection('sessions').doc(id);
             await sessionRef.set({
                 hostId: userId,
-                guestId: partnerId,
+                guestId: partnerIdParam,
                 status: status,
                 strokes: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             sessionId = id;
+            // start listening immediately so both host and guest get updates
+            startListeningForStrokes();
             updateStatus('Session created. Waiting for partner to accept...');
             console.log('Created session:', id);
             return id;
@@ -350,14 +379,24 @@
         partnerId = pid;
         isHost = true;
         setDrawingMode(true);
-        updateStatus(`Sending invitation to ${partnerId}...`);
+        updateStatus(`Creating session and sending invitation to ${partnerId}...`);
 
-        const inviteRef = db.collection('invites').doc(partnerId);
-        await inviteRef.set({
-            senderId: userId,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'pending'
-        });
+        // Create session first, then create invite containing sessionId
+        const sid = await createNewSession(partnerId, 'pending');
+        if (!sid) return;
+        try {
+            const inviteRef = db.collection('invites').doc(partnerId);
+            await inviteRef.set({
+                senderId: userId,
+                sessionId: sid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'pending'
+            });
+            updateStatus('Invitation sent — waiting for partner to accept...');
+        } catch (e) {
+            console.error('Invite send error:', e);
+            updateStatus('Failed to send invite.', true);
+        }
     });
 
     createBtn.addEventListener('click', () => {
@@ -374,12 +413,14 @@
         setDrawingMode(true);
     });
 
-    // Listen for incoming invitations
+    // Listen for incoming invitations for this user
     db.collection('invites').doc(userId).onSnapshot(async (docSnap) => {
         const data = docSnap.data();
         if (data && data.status === 'pending') {
             inviteUserEl.innerText = data.senderId;
             inviteNotificationEl.style.display = 'flex';
+        } else {
+            inviteNotificationEl.style.display = 'none';
         }
     });
 
@@ -389,23 +430,38 @@
         const data = (await inviteRef.get()).data();
         if (!data || data.status !== 'pending') return;
 
+        // Guest joins session — use sessionId stored in invite
         isHost = false;
         partnerId = data.senderId;
         setDrawingMode(false);
         updateStatus(`Accepted invitation from ${partnerId}. You are in view-only mode.`);
 
-        // Now, we create the session doc after acceptance
-        sessionId = await createNewSession(partnerId, 'active');
-        if (sessionId) {
+        if (data.sessionId) {
+            sessionId = data.sessionId;
+            // mark session active and set guestId
+            try {
+                await db.collection('sessions').doc(sessionId).update({ status: 'active', guestId: userId });
+            } catch (e) { console.warn('Failed to update session active:', e); }
+            // Start listening for strokes and for incoming screen-share
             startListeningForStrokes();
-            // Trigger screen share answer flow for the guest
             startScreenShareAsGuest(partnerId, userId);
+        } else {
+            updateStatus('Invite does not contain a session id. Cannot join.', true);
         }
+
+        // remove invite doc (clean up)
+        await inviteRef.delete();
     });
 
     declineInviteBtn.addEventListener('click', async () => {
         inviteNotificationEl.style.display = 'none';
         const inviteRef = db.collection('invites').doc(userId);
+        const data = (await inviteRef.get()).data();
+        if (data && data.sessionId) {
+            try {
+                await db.collection('sessions').doc(data.sessionId).update({ status: 'declined' }).catch(()=>{});
+            } catch (e) { console.warn('Could not update session status on decline:', e); }
+        }
         await inviteRef.delete();
         updateStatus('Invitation declined.');
     });
@@ -416,7 +472,7 @@
         if (!isHost || !sessionId) return;
         try {
             await db.collection('sessions').doc(sessionId).update({ strokes: [] });
-            remoteStrokesMap[sessionId] = [];
+            // snapshot listener will clear local canvas
             updateStatus('Canvas cleared.');
         } catch (e) {
             console.error('Clear error:', e);
@@ -445,7 +501,7 @@
 
     // Host starts screen share
     startShareBtn.addEventListener('click', async () => {
-        if (!isHost || !partnerId) { alert('You must be the host and connected to a partner to start sharing.'); return; }
+        if (!isHost || !partnerId || !sessionId) { alert('You must be the host and connected to a partner to start sharing.'); return; }
         startShareBtn.disabled = true;
         stopShareBtn.disabled = false;
         try {
@@ -473,8 +529,8 @@
         
         callDocRef.onSnapshot(async snap => {
             const data = snap.data();
-            if (data && data.answer && !pc.currentRemoteDescription) {
-                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            if (data && data.answer && pc && !pc.currentRemoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(()=>{});
             }
         });
         answerCandidates.onSnapshot(snap => {
@@ -525,15 +581,11 @@
         });
     }
 
-    // ------------------ RENDER LOOP ------------------
-    (function renderLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        Object.keys(remoteStrokesMap).forEach(sid => {
-            const list = remoteStrokesMap[sid] || [];
-            list.forEach(st => drawStroke(st));
-        });
-        requestAnimationFrame(renderLoop);
-    })();
+    // Clean up when leaving page
+    window.addEventListener('beforeunload', () => {
+        stopScreenShare();
+        stopListeningForStrokes();
+    });
     </script>
 </body>
 </html>
