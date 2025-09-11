@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDesk — Screen Share Only</title>
+<title>AbhiDesk — Screen Share + Chat</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -94,7 +94,7 @@ button.ghost{
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
+  justify-content:flex-start;
   padding:20px;
   position:relative;
   overflow-y:auto;
@@ -102,7 +102,7 @@ button.ghost{
 
 video{
   width:90%;
-  max-width:1000px;
+  max-width:800px;
   height:auto;
   aspect-ratio:16/9;
   border-radius:12px;
@@ -138,7 +138,21 @@ video{
   pointer-events:auto;
 }
 
-/* fullscreen mode */
+#chatBox{
+  width:90%;
+  max-width:600px;
+  height:200px;
+  overflow-y:auto;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+  margin-top:10px;
+  background:rgba(0,0,0,0.2);
+}
+
+#chatInput{padding:8px; border-radius:5px; border:1px solid var(--border); width:70%;}
+#sendChat{padding:8px 12px; margin-left:5px;}
+
 .fullscreen-mode header,
 .fullscreen-mode .controls,
 .fullscreen-mode .status{display:none;}
@@ -150,7 +164,6 @@ video{
   border-radius:0;
 }
 
-/* fullscreen toggle button */
 #fullscreenBtn{
   position:absolute;
   bottom:20px;
@@ -188,6 +201,16 @@ video{
 <div class="main">
   <video id="remoteVideo" autoplay playsinline></video>
   <div id="debugLog" class="status">Waiting for connection...</div>
+
+  <!-- Chat Box -->
+  <div id="chatBox">
+    <div id="chatMessages"></div>
+  </div>
+  <div style="margin-top:5px;">
+    <input id="chatInput" placeholder="Type message...">
+    <button id="sendChat">Send</button>
+  </div>
+
   <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
 </div>
 
@@ -202,7 +225,7 @@ video{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-// ---------------- CONFIG ----------------
+// Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
@@ -214,7 +237,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ---------------- STATE ----------------
+// State
 const userIdEl = document.getElementById('userId');
 function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
 let userId = localStorage.getItem('abhi_userid') || generateId();
@@ -233,16 +256,20 @@ const inviteUserEl = document.getElementById('inviteUser');
 const acceptInviteBtn = document.getElementById('acceptInvite');
 const declineInviteBtn = document.getElementById('declineInvite');
 
+const chatInput = document.getElementById('chatInput');
+const sendChat = document.getElementById('sendChat');
+const chatMessages = document.getElementById('chatMessages');
+
 let sessionId=null, partnerId=null, isHost=false;
 
+// Status helper
 function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
 
-// ---------------- INVITE ----------------
+// --- Invite ---
 inviteBtn.addEventListener('click', async()=>{
   const pid = partnerInput.value.trim();
   if(!pid || pid===userId){alert("Enter valid partner ID"); return;}
-  partnerId = pid;
-  isHost = true;
+  partnerId = pid; isHost = true;
   sessionId = `${userId}_${partnerId}_${Date.now()}`;
   await db.collection("invites").doc(partnerId).set({
     senderId:userId,
@@ -260,7 +287,7 @@ createBtn.addEventListener('click', ()=>{
   updateStatus("New ID ready.");
 });
 
-// Listen for incoming invites
+// Listen for invites
 db.collection("invites").doc(userId).onSnapshot(snap=>{
   const data=snap.data();
   if(data && data.status==="pending"){
@@ -274,7 +301,7 @@ db.collection("invites").doc(userId).onSnapshot(snap=>{
   }
 });
 
-// ---------------- ACCEPT / DECLINE ----------------
+// Accept / Decline
 acceptInviteBtn.addEventListener("click", async()=>{
   inviteNotificationEl.classList.remove("show");
   if(!sessionId) return;
@@ -288,23 +315,37 @@ declineInviteBtn.addEventListener("click", async()=>{
   updateStatus("Invitation declined.");
 });
 
-// ---------------- WEBRTC ----------------
+// --- WebRTC ---
 async function startScreenShareAsGuest(sessionId, callerId, calleeId){
   let pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   let localStream;
-  try {
-    localStream = await navigator.mediaDevices.getDisplayMedia({video:true});
-  } catch(err) {
-    updateStatus("Screen sharing denied: " + err.message);
-    return;
-  }
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true}); }
+  catch(err){ updateStatus("Screen sharing denied: "+err.message); return; }
+  localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
 
   const callRef = db.collection("calls").doc(sessionId);
   const offerCandidates = callRef.collection("offerCandidates");
   const answerCandidates = callRef.collection("answerCandidates");
 
   pc.onicecandidate = e => { if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
+
+  // --- Chat DataChannel ---
+  const chatChannel = pc.createDataChannel("chatChannel");
+  chatChannel.onmessage = e=>{
+    const msg = JSON.parse(e.data);
+    chatMessages.innerHTML += `<div><b>${msg.sender}:</b> ${msg.text}</div>`;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  };
+
+  sendChat.addEventListener("click", ()=>{
+    const text = chatInput.value.trim();
+    if(!text) return;
+    const message = {sender:userId, text};
+    chatChannel.send(JSON.stringify(message));
+    chatMessages.innerHTML += `<div><b>${userId}:</b> ${text}</div>`;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatInput.value="";
+  });
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -316,11 +357,13 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
       await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
     }
   });
+
   offerCandidates.onSnapshot(snap=>{
     snap.docChanges().forEach(async ch=>{
       if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
     });
   });
+
   updateStatus("Screen sharing started!");
 }
 
@@ -335,24 +378,45 @@ db.collection("calls").onSnapshot(snap=>{
       const ansCand = change.doc.ref.collection("answerCandidates");
       const offCand = change.doc.ref.collection("offerCandidates");
       pc2.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
+
+      // Chat DataChannel
+      pc2.ondatachannel = e=>{
+        const chatChannel = e.channel;
+        chatChannel.onmessage = ev=>{
+          const msg = JSON.parse(ev.data);
+          chatMessages.innerHTML += `<div><b>${msg.sender}:</b> ${msg.text}</div>`;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        };
+        sendChat.addEventListener("click", ()=>{
+          const text = chatInput.value.trim();
+          if(!text) return;
+          const message = {sender:userId, text};
+          chatChannel.send(JSON.stringify(message));
+          chatMessages.innerHTML += `<div><b>${userId}:</b> ${text}</div>`;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          chatInput.value="";
+        });
+      };
+
       await pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
       const ans = await pc2.createAnswer(); await pc2.setLocalDescription(ans);
       await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
+
       ansCand.onSnapshot(ss=>{
         ss.docChanges().forEach(async ch=>{
           if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
         });
       });
+
       updateStatus("Receiving partner screen...");
     }
   });
 });
 
-// ---------------- FULLSCREEN TOGGLE ----------------
+// Fullscreen
 const fullscreenBtn = document.getElementById("fullscreenBtn");
-fullscreenBtn.addEventListener("click", ()=>{
-  document.body.classList.toggle("fullscreen-mode");
-});
+fullscreenBtn.addEventListener("click", ()=>{ document.body.classList.toggle("fullscreen-mode"); });
+
 </script>
 </body>
 </html>
