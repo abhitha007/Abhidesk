@@ -1,85 +1,97 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDesk — Screen Share + Remote Control (Enhanced)</title>
+<title>AbhiDesk — Screen Share + Remote Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 :root{
-  --bg:#0f1622; --accent:#e60073; --secondary:#00aaff; --muted:#b0b6c6; --glass:rgba(255,255,255,0.04); --border:rgba(255,255,255,0.08);
+  --bg:#1a1f30;
+  --accent:#e60073;
+  --secondary:#00aaff;
+  --muted:#b0b6c6;
+  --glass:rgba(255,255,255,0.05);
+  --border:rgba(255,255,255,0.1);
 }
-*{box-sizing:border-box}
-body{margin:0;font-family:'Poppins',sans-serif;background:linear-gradient(180deg,#07101a,#0b1220);color:#e6eef6;min-height:100vh;display:flex;flex-direction:column}
-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)}
-h1{margin:0;color:var(--accent);font-weight:700}
-.controls{display:flex;gap:10px;align-items:center;padding:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
-input[type=text]{padding:10px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.24);color:inherit;min-width:220px}
-button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
-button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
-.main{flex:1;display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px;overflow:auto}
-.video-wrap{position:relative;width:90%;max-width:1000px}
-video#remoteVideo{width:100%;height:auto;background:#000;border-radius:12px;border:1px solid var(--border)}
-.overlay-cursor{position:absolute;width:20px;height:20px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;background:rgba(230,0,115,0.85);display:none}
-.status{color:var(--muted);text-align:center}
-.notification{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.03);border-radius:12px;padding:16px;backdrop-filter:blur(6px);z-index:1000;display:none}
-.notification.show{display:block}
-.file-input{display:none}
-.small{font-size:13px;color:var(--muted)}
-.controls-right{margin-left:auto;display:flex;gap:8px;align-items:center}
-#log{max-width:1000px;white-space:pre-wrap;color:var(--muted);font-size:13px}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:'Poppins',sans-serif;
+  background:linear-gradient(180deg,#101420,#161a2b);
+  color:#e6eef6;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:16px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+h1{ font-weight:700; color:var(--accent); margin:0;}
+.user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border);}
+.controls{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
+button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.2s ease;}
+button:hover{opacity:0.85;}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:20px;position:relative;overflow-y:auto;}
+video{width:90%;max-width:800px;height:auto;aspect-ratio:16/9;border-radius:12px;background:#000;border:1px solid var(--border);transition:all 0.3s ease;}
+.status{margin-top:10px;color:var(--muted);text-align:center;}
+.notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;}
+.notification.show{opacity:1;pointer-events:auto;}
+.fullscreen-mode header,.fullscreen-mode .controls,.fullscreen-mode .status{display:none;}
+.fullscreen-mode .main{padding:0;}
+.fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
+#fullscreenBtn{position:absolute;bottom:20px;right:20px;background:rgba(0,0,0,0.5);border:none;border-radius:50%;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:20px;transition:all 0.2s ease;}
+#fullscreenBtn:hover{background:rgba(0,0,0,0.7);}
 </style>
 </head>
 <body>
+
 <header>
   <h1>AbhiDesk 🚀</h1>
-  <div class="small">Your ID: <strong id="userId">...</strong></div>
+  <div class="user-pill">Your ID: <span id="userId">...</span></div>
 </header>
 
 <div class="controls">
   <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
   <button id="inviteBtn">Invite</button>
-  <button id="newIdBtn" class="ghost">New ID</button>
-
-  <div class="controls-right">
-    <button id="startShareBtn" class="ghost">Share Screen</button>
-    <button id="stopShareBtn" class="ghost" disabled>Stop Share</button>
-    <button id="requestControlBtn" class="ghost" disabled>Request Control</button>
-    <input id="fileInput" class="file-input" type="file" multiple>
-    <button id="sendFileBtn" class="ghost" disabled>Send File</button>
-  </div>
+  <button id="createBtn" class="ghost">New ID</button>
+  <div id="connStatus" class="status">Ready to connect...</div>
 </div>
 
 <div class="main">
-  <div class="video-wrap">
-    <video id="remoteVideo" autoplay playsinline></video>
-    <div id="overlayCursor" class="overlay-cursor"></div>
-  </div>
-
-  <div id="log" class="status">Ready.</div>
-  <div class="small" id="connStatus">Not connected</div>
+  <video id="remoteVideo" autoplay playsinline></video>
+  <div id="debugLog" class="status">Waiting for connection...</div>
+  <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
 </div>
 
-<!-- Invite UI -->
-<div id="inviteNotif" class="notification">
-  <div><strong id="inviteFrom"></strong> invited you to view/share screen.</div>
-  <div style="margin-top:8px"><button id="acceptInvite">Accept</button> <button id="declineInvite" class="ghost">Decline</button></div>
+<!-- Invite notification -->
+<div id="inviteNotification" class="notification">
+  <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
+  <button id="acceptInvite">Accept</button>
+  <button id="declineInvite" class="ghost">Decline</button>
 </div>
 
-<!-- Control request UI -->
-<div id="controlNotif" class="notification">
-  <div><strong id="controlFrom"></strong> requests control.</div>
-  <div style="margin-top:8px"><button id="allowControl">Allow</button> <button id="denyControl" class="ghost">Deny</button></div>
+<!-- Control permission notification -->
+<div id="controlNotification" class="notification">
+  <p><strong id="controlUser"></strong> wants to control your screen.</p>
+  <button id="acceptControl">Allow</button>
+  <button id="declineControl" class="ghost">Decline</button>
 </div>
 
-<!-- Firebase libs (compat for quick use) -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* =========================
-   Configuration - replace with your own Firebase config
-   ========================= */
+// ---------------- Firebase ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
@@ -91,522 +103,176 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-/* =========================
-   UI elements
-   ========================= */
+// ---------------- State ----------------
 const userIdEl = document.getElementById('userId');
+function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
+let userId = localStorage.getItem('abhi_userid') || generateId();
+localStorage.setItem('abhi_userid', userId);
+userIdEl.innerText = userId;
+
 const partnerInput = document.getElementById('partnerId');
 const inviteBtn = document.getElementById('inviteBtn');
-const newIdBtn = document.getElementById('newIdBtn');
-const startShareBtn = document.getElementById('startShareBtn');
-const stopShareBtn = document.getElementById('stopShareBtn');
-const requestControlBtn = document.getElementById('requestControlBtn');
-const sendFileBtn = document.getElementById('sendFileBtn');
-const fileInput = document.getElementById('fileInput');
-const remoteVideo = document.getElementById('remoteVideo');
-const overlayCursor = document.getElementById('overlayCursor');
-const logEl = document.getElementById('log');
+const createBtn = document.getElementById('createBtn');
 const connStatus = document.getElementById('connStatus');
+const debugLogEl = document.getElementById('debugLog');
+const remoteVideo = document.getElementById('remoteVideo');
 
-const inviteNotif = document.getElementById('inviteNotif');
-const inviteFrom = document.getElementById('inviteFrom');
-const acceptInvite = document.getElementById('acceptInvite');
-const declineInvite = document.getElementById('declineInvite');
+const inviteNotificationEl = document.getElementById('inviteNotification');
+const inviteUserEl = document.getElementById('inviteUser');
+const acceptInviteBtn = document.getElementById('acceptInvite');
+const declineInviteBtn = document.getElementById('declineInvite');
 
-const controlNotif = document.getElementById('controlNotif');
-const controlFrom = document.getElementById('controlFrom');
-const allowControl = document.getElementById('allowControl');
-const denyControl = document.getElementById('denyControl');
+const controlNotificationEl = document.getElementById('controlNotification');
+const controlUserEl = document.getElementById('controlUser');
+const acceptControlBtn = document.getElementById('acceptControl');
+const declineControlBtn = document.getElementById('declineControl');
 
-/* =========================
-   Local state
-   ========================= */
-function genId(){ return Math.floor(100000000 + Math.random()*900000000).toString(); }
-let myId = localStorage.getItem('abhi_userid') || genId();
-localStorage.setItem('abhi_userid', myId);
-userIdEl.innerText = myId;
+let sessionId=null, partnerId=null, isHost=false;
+let controlChannel=null, controlAllowed=false;
+let pc=null;
 
-let pc = null;
-let controlChannel = null; // reliable data channel for control messages
-let fileChannel = null;    // optional file channel
-let localStream = null;
-let sessionDoc = null;
-let partnerId = null;
-let isHost = false;
-let pendingCandidatesBuffer = []; // buffer candidates until pc exists
-let grantedControl = false;
+// ---------------- Helpers ----------------
+function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
 
-/* Simple logger */
-function log(...args){ logEl.innerText = (new Date()).toLocaleTimeString() + " — " + args.join(" ") + "\n" + logEl.innerText; }
-
-/* -------------------------
-   Signaling helpers (Firestore)
-   ------------------------- */
-function sessionRef(id){ return db.collection('calls').doc(id); }
-
-/* -------------------------
-   Invite flow
-   ------------------------- */
-inviteBtn.addEventListener('click', async ()=>{
+// ---------------- Invite ----------------
+inviteBtn.addEventListener('click', async()=>{
   const pid = partnerInput.value.trim();
-  if(!pid || pid === myId){ alert('Enter valid partner id'); return; }
-  // write invite doc to partner's invites collection
-  const invRef = db.collection('invites').doc(pid);
-  const sid = `${myId}_${pid}_${Date.now()}`;
-  await invRef.set({ sender: myId, sessionId: sid, ts: firebase.firestore.FieldValue.serverTimestamp(), status: 'pending' });
-  log('Invite sent to', pid);
-  connStatus.innerText = 'Invite sent — waiting...';
+  if(!pid || pid===userId){alert("Enter valid partner ID"); return;}
   partnerId = pid; isHost = true;
+  sessionId = `${userId}_${partnerId}_${Date.now()}`;
+  await db.collection("invites").doc(partnerId).set({
+    senderId:userId,
+    sessionId,
+    timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+    status:"pending"
+  });
+  updateStatus("Invitation sent — waiting...");
 });
 
-/* Listen for invites to me */
-db.collection('invites').doc(myId).onSnapshot(snap=>{
+createBtn.addEventListener('click', ()=>{
+  userId = generateId();
+  localStorage.setItem('abhi_userid', userId);
+  userIdEl.innerText = userId;
+  updateStatus("New ID ready.");
+});
+
+// Listen for incoming invites
+db.collection("invites").doc(userId).onSnapshot(snap=>{
   const data = snap.data();
-  if(data && data.status === 'pending'){
-    inviteFrom.innerText = data.sender;
-    inviteNotif.classList.add('show');
-    inviteNotif.classList.add('visible');
-    inviteNotif.style.display = 'block';
-    partnerId = data.sender; // store who invited
-    sessionDoc = sessionRef(data.sessionId);
-  } else {
-    inviteNotif.style.display = 'none';
+  if(data && data.status==="pending"){
+    inviteUserEl.innerText = data.senderId;
+    inviteNotificationEl.classList.add("show");
+    sessionId = data.sessionId;
+    partnerId = data.senderId;
+    isHost=false;
+  }else{
+    inviteNotificationEl.classList.remove("show");
   }
 });
 
-acceptInvite.addEventListener('click', async ()=>{
-  inviteNotif.style.display = 'none';
-  if(!sessionDoc) { log('No session doc'); return; }
-  // remove invite
-  await db.collection('invites').doc(myId).delete();
-  log('Accepted invite. Starting as guest (sharing).');
-  startScreenShareAsGuest(sessionDoc.id, partnerId, myId);
+// Accept / Decline
+acceptInviteBtn.addEventListener("click", async()=>{
+  inviteNotificationEl.classList.remove("show");
+  if(!sessionId) return;
+  await db.collection("invites").doc(userId).delete();
+  updateStatus("Starting screen share...");
+  startScreenShareAsGuest(sessionId, partnerId, userId);
 });
-declineInvite.addEventListener('click', async ()=>{
-  inviteNotif.style.display = 'none';
-  await db.collection('invites').doc(myId).delete();
-  log('Invite declined.');
+declineInviteBtn.addEventListener("click", async()=>{
+  inviteNotificationEl.classList.remove("show");
+  await db.collection("invites").doc(userId).delete();
+  updateStatus("Invitation declined.");
 });
 
-/* =========================
-   WebRTC core building
-   - single function to create RTCPeerConnection with consistent handlers
-   ========================= */
-function createPeerConnection(){
-  // Add TURN servers for production. For testing STUN-only is often enough.
-  const config = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      // For production, add TURN servers here:
-      // { urls: "turn:your.turn.server:3478", username: "user", credential: "pass" }
-    ]
-  };
-  const pcLocal = new RTCPeerConnection(config);
-
-  pcLocal.onicecandidate = e=>{
-    if(!e.candidate) return;
-    if(!sessionDoc){
-      pendingCandidatesBuffer.push(e.candidate.toJSON());
-      return;
-    }
-    // send to appropriate collection depending on role
-    const col = isHost ? sessionDoc.collection('offerCandidates') : sessionDoc.collection('answerCandidates');
-    col.add(e.candidate.toJSON());
-  };
-
-  pcLocal.onconnectionstatechange = ()=>{ log('Connection state:', pcLocal.connectionState); connStatus.innerText = 'Connection: ' + pcLocal.connectionState; };
-
-  // for guest who shares screen (host receives tracks)
-  pcLocal.ontrack = ev=>{
-    // attach incoming media to video
-    remoteVideo.srcObject = ev.streams[0] || ev.streams;
-    log('Remote track received');
-  };
-
-  // datachannels from remote
-  pcLocal.ondatachannel = e=>{
-    if(e.channel.label === 'controlChannel'){
-      controlChannel = e.channel;
-      setupControlChannel();
-      log('Control channel received');
-    } else if(e.channel.label === 'fileChannel'){
-      fileChannel = e.channel;
-      setupFileChannelReceiver();
-      log('File channel received');
-    }
-  };
-
-  return pcLocal;
-}
-
-/* =========================
-   Guest (callee) — shares screen, creates offer then waits for answer
-   ========================= */
+// ---------------- WebRTC + Remote Control ----------------
 async function startScreenShareAsGuest(sessionId, callerId, calleeId){
-  if(pc) { log('Already in session'); return; }
-  isHost = false;
-  partnerId = callerId;
-  sessionDoc = sessionRef(sessionId);
-
-  pc = createPeerConnection();
-
-  // create two reliable ordered data channels: control and file
-  controlChannel = pc.createDataChannel('controlChannel', { ordered:true });
-  controlChannel.onopen = ()=>{ log('Control channel open (guest)'); };
-  controlChannel.onmessage = e=>{ handleControlMessage(e.data, /*fromHost*/true); };
-
-  fileChannel = pc.createDataChannel('fileChannel', { ordered:true });
-  fileChannel.onopen = ()=>{ log('File channel open'); };
-  fileChannel.onmessage = e=>{ handleFileChunk(e.data); };
-
-  // get display stream
-  try{
-    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-  } catch(err){
-    log('Screen share denied:', err.message);
-    return;
-  }
+  pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  let localStream;
+  try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true}); }
+  catch(err){ updateStatus("Screen sharing denied: "+err.message); return; }
   localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
-  stopShareBtn.disabled = false;
-  startShareBtn.disabled = true;
 
-  // create offer
+  const callRef = db.collection("calls").doc(sessionId);
+  const offerCandidates = callRef.collection("offerCandidates");
+  const answerCandidates = callRef.collection("answerCandidates");
+
+  pc.onicecandidate = e=>{ if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
+
+  // Control channel
+  controlChannel = pc.createDataChannel("controlChannel");
+  controlChannel.onopen = ()=>{ console.log("Control channel open"); };
+  controlChannel.onmessage = e=>{
+    if(!controlAllowed) return;
+    const msg = JSON.parse(e.data);
+    if(msg.type==="click"){
+      remoteVideo.dispatchEvent(new MouseEvent("click",{clientX:msg.clientX,clientY:msg.clientY,bubbles:true}));
+    }else if(msg.type==="keydown"){
+      document.dispatchEvent(new KeyboardEvent("keydown",{key:msg.key}));
+    }else if(msg.type==="mousemove"){
+      // Could implement cursor sync here
+    }
+  };
+
+  acceptControlBtn.onclick = ()=>{
+    controlAllowed=true; controlNotificationEl.classList.remove("show");
+  };
+  declineControlBtn.onclick = ()=>{
+    controlAllowed=false; controlNotificationEl.classList.remove("show");
+    if(controlChannel) controlChannel.close();
+  };
+
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
+  await callRef.set({offer:{type:offer.type,sdp:offer.sdp},caller:callerId,callee:calleeId});
 
-  // write offer to firestore session doc
-  await sessionDoc.set({ offer: { type: offer.type, sdp: offer.sdp }, hostId: callerId, guestId: calleeId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-
-  // flush any buffered candidates
-  pendingCandidatesBuffer.forEach(c=> sessionDoc.collection('answerCandidates').add(c) );
-  pendingCandidatesBuffer = [];
-
-  // listen for answer
-  sessionDoc.onSnapshot(async snap=>{
+  callRef.onSnapshot(async snap=>{
     const data = snap.data();
-    if(!data) return;
-    if(data.answer && !pc.currentRemoteDescription){
-      const ansDesc = new RTCSessionDescription(data.answer);
-      await pc.setRemoteDescription(ansDesc);
-      log('Answer applied.');
+    if(data && data.answer && !pc.currentRemoteDescription){
+      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
     }
   });
-
-  // listen for offerCandidates from host (host will add candidates into offerCandidates collection)
-  sessionDoc.collection('offerCandidates').onSnapshot(ss=>{
-    ss.docChanges().forEach(async ch=>{
-      if(ch.type === 'added'){
-        const candidate = new RTCIceCandidate(ch.doc.data());
-        try { await pc.addIceCandidate(candidate); log('Added offer candidate'); } catch(e){ console.warn(e); }
-      }
-    });
-  });
-
-  log('Screen sharing started. Waiting for host to connect.');
-  connStatus.innerText = 'Sharing screen — waiting for viewer';
+  offerCandidates.onSnapshot(snap=>{snap.docChanges().forEach(async ch=>{if(ch.type==="added") await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));});});
+  updateStatus("Screen sharing started!");
 }
 
-/* Stop sharing */
-stopShareBtn.addEventListener('click', ()=>{
-  if(localStream){
-    localStream.getTracks().forEach(t=>t.stop());
-    localStream = null;
-  }
-  if(pc){
-    pc.close(); pc = null;
-  }
-  stopShareBtn.disabled = true; startShareBtn.disabled = false;
-  connStatus.innerText = 'Stopped sharing';
-  log('Screen share stopped');
-});
-
-/* =========================
-   Host — receives offer, creates answer and sets up tracks and datachannel
-   We listen to calls collection and when a doc with sessionId that matches partnerId is added we treat it.
-   ========================= */
-db.collection('calls').onSnapshot(snap=>{
+// Host: receive remote screen
+db.collection("calls").onSnapshot(snap=>{
   snap.docChanges().forEach(async change=>{
-    // if host (I invited) and an offer doc appears that contains my userId as hostId/guestId depending on naming
-    if(change.type === 'added' && isHost && change.doc.id.includes(myId) === false){
-      // to be safe only handle docs that include both ids
+    if(change.type==="added" && isHost && change.doc.id.includes(userId)){
       const data = change.doc.data();
-      if(!data || !data.offer) return;
-      // If this session's hostId equals myId or guestId equals myId? We invited partner so session id contains both; do further checks below
-      // We check that the offer was created with hostId === myId OR guestId === partnerId depending on previous logic
-      if(!change.doc.id.includes(partnerId) && !change.doc.id.includes(myId)) return;
-
-      sessionDoc = change.doc.ref;
-      pc = createPeerConnection();
-
-      // incoming track event (we still handle pc.ontrack created earlier)
+      pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
       const inbound = new MediaStream();
-      pc.ontrack = ev => {
-        ev.streams[0].getTracks().forEach(t => inbound.addTrack(t));
-        remoteVideo.srcObject = inbound;
+      pc.ontrack = ev => { ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
+
+      const ansCand = change.doc.ref.collection("answerCandidates");
+      const offCand = change.doc.ref.collection("offerCandidates");
+      pc.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
+
+      pc.ondatachannel = e=>{
+        if(e.channel.label==="controlChannel"){
+          controlChannel = e.channel;
+
+          // Request control button (for host)
+          const requestBtn = document.createElement("button");
+          requestBtn.innerText="Request Control";
+          requestBtn.style.margin="10px";
+          requestBtn.onclick = ()=>{ controlChannel.send(JSON.stringify({type:"requestControl"})); };
+          document.querySelector(".controls").appendChild(requestBtn);
+        }
       };
 
-      // create answer
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await sessionDoc.update({ answer: { type: answer.type, sdp: answer.sdp } });
-
-      // wire up candidates
-      sessionDoc.collection('answerCandidates').onSnapshot(ss=>{
-        ss.docChanges().forEach(async ch=>{
-          if(ch.type === 'added'){
-            try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); log('Added answer candidate'); } catch(e){ console.warn(e); }
-          }
-        });
-      });
-      sessionDoc.collection('offerCandidates').onSnapshot(ss=>{
-        ss.docChanges().forEach(async ch=>{
-          if(ch.type === 'added'){
-            try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); log('Added offer candidate'); } catch(e){ console.warn(e); }
-          }
-        });
-      });
-
-      log('Connected to guest (viewer). Ready to receive stream.');
-      connStatus.innerText = 'Connected — receiving screen';
-      // create a UI button to request control
-      requestControlBtn.disabled = false;
+      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+      await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
+      ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added") await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));});});
+      updateStatus("Receiving partner screen...");
     }
   });
 });
 
-/* =========================
-   Control channel helpers
-   ========================= */
-function setupControlChannel(){
-  if(!controlChannel) return;
-  controlChannel.onmessage = e => { handleControlMessage(e.data, /*fromRemote*/false); };
-  controlChannel.onopen = ()=>{ log('Control channel open'); };
-  controlChannel.onclose = ()=>{ log('Control channel closed'); };
-}
-
-/* Control message handler
-   Messages are JSON strings:
-   {type:'requestControl'}                   // request from host -> guest
-   {type:'controlRequestResponse', allow:true/false}
-   {type:'mouse', x:..., y:..., btn:...}     // host -> guest (simulate)
-   {type:'keyboard', key:'a', code:'KeyA', type:'keydown' }
-   {type:'cursor', xPct:0.5, yPct:0.4}       // host -> guest, overlay cursor
-   {type:'clipboard', text:'...'}
-*/
-function handleControlMessage(raw, fromHost){
-  let msg;
-  try{ msg = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e){ console.warn('Invalid control message', raw); return; }
-  if(msg.type === 'requestControl'){
-    // show permission prompt to guest
-    controlFrom.innerText = partnerId || 'Partner';
-    controlNotif.style.display = 'block';
-    // store controlChannel if needed
-  } else if(msg.type === 'controlRequestResponse'){
-    if(msg.allow){
-      grantedControl = true;
-      log('Control request accepted by guest');
-    } else {
-      grantedControl = false;
-      log('Control request denied by guest');
-    }
-  } else if(msg.type === 'cursor'){
-    // show overlay cursor on host side (viewer)
-    overlayCursor.style.display = 'block';
-    overlayCursor.style.left = (msg.xPct * 100) + '%';
-    overlayCursor.style.top = (msg.yPct * 100) + '%';
-  } else if(msg.type === 'clipboard'){
-    // guest shares clipboard text
-    navigator.clipboard?.writeText?.(msg.text).then(()=> log('Clipboard updated locally')).catch(()=>log('Clipboard write failed'));
-  } else if(msg.type === 'mouse' || msg.type === 'keyboard'){
-    // IMPORTANT: We cannot inject system-wide input from browser. But if the guest page/app listens for these events, they can act accordingly.
-    // For demo we synthesize events into the remoteVideo element (works only inside the page)
-    if(msg.type === 'mouse'){
-      const ev = new MouseEvent(msg.eventType || 'click', {clientX: msg.clientX, clientY: msg.clientY, bubbles: true});
-      remoteVideo.dispatchEvent(ev);
-    } else if(msg.type === 'keyboard'){
-      const ev = new KeyboardEvent(msg.eventType || 'keydown', {key: msg.key, code: msg.code, bubbles: true});
-      document.dispatchEvent(ev);
-    }
-  } else {
-    log('Unknown control message:', msg.type);
-  }
-}
-
-/* =========================
-   Request control (host) -> guest
-   ========================= */
-requestControlBtn.addEventListener('click', ()=>{
-  if(!controlChannel){
-    // create a temporary control channel to send request if not attached yet
-    if(pc){
-      controlChannel = pc.createDataChannel('controlChannel', { ordered:true });
-      setupControlChannel();
-    } else {
-      log('No peer connection / control channel yet');
-      return;
-    }
-  }
-  controlChannel.send(JSON.stringify({ type: 'requestControl', from: myId }));
-  log('Control request sent');
-  connStatus.innerText = 'Control request sent';
-});
-
-/* Guest response to control request (Allow / Deny) */
-allowControl.addEventListener('click', ()=>{
-  controlNotif.style.display = 'none';
-  grantedControl = true;
-  if(controlChannel && controlChannel.readyState === 'open'){
-    controlChannel.send(JSON.stringify({ type: 'controlRequestResponse', allow: true }));
-  }
-  log('Control allowed for host');
-});
-denyControl.addEventListener('click', ()=>{
-  controlNotif.style.display = 'none';
-  if(controlChannel && controlChannel.readyState === 'open'){
-    controlChannel.send(JSON.stringify({ type: 'controlRequestResponse', allow: false }));
-  }
-  log('Control denied');
-});
-
-/* =========================
-   Cursor + mouse forwarding (host-side) - send normalized coords to guest
-   Host sends cursor on mousemove over video, and sends mouse click events.
-   Guest uses those to show overlay cursor and (optionally) synthesize events.
-   ========================= */
-remoteVideo.addEventListener('mousemove', (e)=>{
-  if(!controlChannel || controlChannel.readyState !== 'open' || !grantedControl) return;
-  const rect = remoteVideo.getBoundingClientRect();
-  const xPct = (e.clientX - rect.left) / rect.width;
-  const yPct = (e.clientY - rect.top) / rect.height;
-  controlChannel.send(JSON.stringify({ type: 'cursor', xPct, yPct }));
-});
-
-remoteVideo.addEventListener('click', (e)=>{
-  if(!controlChannel || controlChannel.readyState !== 'open' || !grantedControl) return;
-  const rect = remoteVideo.getBoundingClientRect();
-  const clientX = e.clientX - rect.left;
-  const clientY = e.clientY - rect.top;
-  controlChannel.send(JSON.stringify({ type: 'mouse', eventType: 'click', clientX, clientY }));
-});
-
-/* =========================
-   Clipboard sync
-   Host can send clipboard to guest (only if guest gave permission to write clipboard)
-   ========================= */
-async function sendClipboardToGuest(){
-  if(!navigator.clipboard) return;
-  try{
-    const txt = await navigator.clipboard.readText();
-    if(controlChannel && controlChannel.readyState === 'open'){
-      controlChannel.send(JSON.stringify({ type: 'clipboard', text: txt }));
-      log('Clipboard sent to guest');
-    }
-  }catch(e){ log('Clipboard read failed'); }
-}
-
-/* =========================
-   File transfer (simple chunking over a datachannel)
-   - This is a naive implementation; for large files use chunking + progress + resumable logic
-   ========================= */
-sendFileBtn.addEventListener('click', ()=> fileInput.click());
-fileInput.addEventListener('change', async (ev)=>{
-  const files = Array.from(ev.target.files || []);
-  if(!files.length) return;
-  if(!fileChannel || fileChannel.readyState !== 'open'){
-    log('File channel not ready');
-    return;
-  }
-  for(const file of files){
-    log('Sending file', file.name, file.size);
-    // send a header first
-    fileChannel.send(JSON.stringify({ type: 'file-meta', name: file.name, size: file.size }));
-    // send content in slices
-    const chunkSize = 64 * 1024; // 64kb
-    let offset = 0;
-    while(offset < file.size){
-      const slice = file.slice(offset, offset + chunkSize);
-      const arrayBuffer = await slice.arrayBuffer();
-      fileChannel.send(arrayBuffer); // send raw binary chunk
-      offset += chunkSize;
-    }
-    log('File sent:', file.name);
-  }
-});
-
-/* Receiver side for file chunks */
-let incomingFileBuffer = [];
-let incomingFileMeta = null;
-function setupFileChannelReceiver(){
-  if(!fileChannel) return;
-  fileChannel.onmessage = (e) => {
-    // if string => metadata
-    if(typeof e.data === 'string'){
-      try{
-        const m = JSON.parse(e.data);
-        if(m.type === 'file-meta'){
-          incomingFileMeta = m;
-          incomingFileBuffer = [];
-          log('Incoming file:', m.name, m.size);
-        }
-      }catch(err){ console.warn(err); }
-    } else {
-      // binary chunk
-      incomingFileBuffer.push(e.data);
-      // simple check for completion
-      const receivedSize = incomingFileBuffer.reduce((s,b)=>s+(b.byteLength||b.length||0),0);
-      if(incomingFileMeta && receivedSize >= incomingFileMeta.size){
-        // assemble
-        const blob = new Blob(incomingFileBuffer);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = incomingFileMeta.name || 'download.bin';
-        a.click();
-        log('File received and downloaded:', incomingFileMeta.name);
-        incomingFileBuffer = [];
-        incomingFileMeta = null;
-      }
-    }
-  };
-}
-
-/* Handler for received file chunk when a datachannel was created earlier */
-function handleFileChunk(data){
-  // Not used if using fileChannel.onmessage above; left as extension point
-}
-
-/* =========================
-   Utility: create a fresh id (for host wanting new id)
-   ========================= */
-newIdBtn.addEventListener('click', ()=>{
-  myId = genId();
-  localStorage.setItem('abhi_userid', myId);
-  userIdEl.innerText = myId;
-  log('New ID generated');
-});
-
-/* Start share button for guest (manual start) */
-startShareBtn.addEventListener('click', async ()=>{
-  // Simple flow: guest can generate a session id and wait; or rely on invites.
-  // For quick manual sharing, create a session doc where caller is 'manual'
-  const pid = partnerInput.value.trim();
-  if(!pid){ alert('Enter partner ID to create session'); return; }
-  partnerId = pid; isHost = false;
-  const sid = `${myId}_${partnerId}_${Date.now()}`;
-  sessionDoc = sessionRef(sid);
-  await startScreenShareAsGuest(sid, partnerId, myId);
-});
-
-/* Dispose / cleanup on unload */
-window.addEventListener('beforeunload', ()=>{
-  if(pc) pc.close();
-  if(localStream) localStream.getTracks().forEach(t=>t.stop());
-});
-
-/* =========================
-   Notes & next steps (displayed in log)
-   ========================= */
-log('Enhanced AbhiDesk loaded. Note: Browser cannot inject OS-level events outside the page. For full AnyDesk-like control you must build a native client/agent (e.g., RustDesk or Electron + native modules).');
+// Fullscreen
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+fullscreenBtn.addEventListener("click", ()=>{ document.body.classList.toggle("fullscreen-mode"); });
 </script>
 </body>
 </html>
