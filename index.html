@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDesk — Screen Share + Chat + Remote Control</title>
+<title>AbhiDesk — Screen Share + Remote Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -45,9 +45,6 @@ video{width:90%;max-width:800px;height:auto;aspect-ratio:16/9;border-radius:12px
 .status{margin-top:10px;color:var(--muted);text-align:center;}
 .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;}
 .notification.show{opacity:1;pointer-events:auto;}
-#chatBox{width:90%;max-width:600px;height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:10px;background:rgba(0,0,0,0.2);}
-#chatInput{padding:8px;border-radius:5px;border:1px solid var(--border);width:70%;}
-#sendChat{padding:8px 12px;margin-left:5px;}
 .fullscreen-mode header,.fullscreen-mode .controls,.fullscreen-mode .status{display:none;}
 .fullscreen-mode .main{padding:0;}
 .fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
@@ -72,12 +69,6 @@ video{width:90%;max-width:800px;height:auto;aspect-ratio:16/9;border-radius:12px
 <div class="main">
   <video id="remoteVideo" autoplay playsinline></video>
   <div id="debugLog" class="status">Waiting for connection...</div>
-
-  <!-- Chat Box -->
-  <div id="chatBox"></div>
-  <input type="text" id="chatInput" placeholder="Type message...">
-  <button id="sendChat">Send</button>
-
   <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
 </div>
 
@@ -125,9 +116,6 @@ const createBtn = document.getElementById('createBtn');
 const connStatus = document.getElementById('connStatus');
 const debugLogEl = document.getElementById('debugLog');
 const remoteVideo = document.getElementById('remoteVideo');
-const chatBox = document.getElementById('chatBox');
-const chatInput = document.getElementById('chatInput');
-const sendChat = document.getElementById('sendChat');
 
 const inviteNotificationEl = document.getElementById('inviteNotification');
 const inviteUserEl = document.getElementById('inviteUser');
@@ -141,10 +129,10 @@ const declineControlBtn = document.getElementById('declineControl');
 
 let sessionId=null, partnerId=null, isHost=false;
 let controlChannel=null, controlAllowed=false;
+let pc=null;
 
 // ---------------- Helpers ----------------
 function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
-function addChatMessage(sender, text){chatBox.innerHTML += `<div><b>${sender}:</b> ${text}</div>`; chatBox.scrollTop=chatBox.scrollHeight;}
 
 // ---------------- Invite ----------------
 inviteBtn.addEventListener('click', async()=>{
@@ -196,9 +184,9 @@ declineInviteBtn.addEventListener("click", async()=>{
   updateStatus("Invitation declined.");
 });
 
-// ---------------- WebRTC + Chat + Control ----------------
+// ---------------- WebRTC + Remote Control ----------------
 async function startScreenShareAsGuest(sessionId, callerId, calleeId){
-  const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   let localStream;
   try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true}); }
   catch(err){ updateStatus("Screen sharing denied: "+err.message); return; }
@@ -210,19 +198,9 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
 
   pc.onicecandidate = e=>{ if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
 
-  // Chat
-  const chatChannel = pc.createDataChannel("chatChannel");
-  chatChannel.onmessage = e=>{ const msg = JSON.parse(e.data); addChatMessage(msg.sender,msg.text); };
-  sendChat.addEventListener("click", ()=>{ 
-    const text = chatInput.value.trim(); if(!text) return;
-    chatChannel.send(JSON.stringify({sender:userId,text}));
-    addChatMessage(userId,text);
-    chatInput.value="";
-  });
-
   // Control channel
   controlChannel = pc.createDataChannel("controlChannel");
-  controlChannel.onopen = ()=>{ console.log("Control channel ready"); }
+  controlChannel.onopen = ()=>{ console.log("Control channel open"); };
   controlChannel.onmessage = e=>{
     if(!controlAllowed) return;
     const msg = JSON.parse(e.data);
@@ -230,20 +208,17 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
       remoteVideo.dispatchEvent(new MouseEvent("click",{clientX:msg.clientX,clientY:msg.clientY,bubbles:true}));
     }else if(msg.type==="keydown"){
       document.dispatchEvent(new KeyboardEvent("keydown",{key:msg.key}));
+    }else if(msg.type==="mousemove"){
+      // Could implement cursor sync here
     }
   };
 
-  // Control permission
-  controlChannel.onopen = ()=>{
-    controlUserEl.innerText = callerId;
-    controlNotificationEl.classList.add("show");
-  };
   acceptControlBtn.onclick = ()=>{
     controlAllowed=true; controlNotificationEl.classList.remove("show");
   };
   declineControlBtn.onclick = ()=>{
     controlAllowed=false; controlNotificationEl.classList.remove("show");
-    controlChannel.close();
+    if(controlChannel) controlChannel.close();
   };
 
   const offer = await pc.createOffer();
@@ -265,7 +240,7 @@ db.collection("calls").onSnapshot(snap=>{
   snap.docChanges().forEach(async change=>{
     if(change.type==="added" && isHost && change.doc.id.includes(userId)){
       const data = change.doc.data();
-      const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
       const inbound = new MediaStream();
       pc.ontrack = ev => { ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
 
@@ -273,28 +248,16 @@ db.collection("calls").onSnapshot(snap=>{
       const offCand = change.doc.ref.collection("offerCandidates");
       pc.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
 
-      // Chat
       pc.ondatachannel = e=>{
-        if(e.channel.label==="chatChannel"){
-          e.channel.onmessage = ev=>{ const msg=JSON.parse(ev.data); addChatMessage(msg.sender,msg.text); };
-          sendChat.addEventListener("click", ()=>{
-            const text = chatInput.value.trim(); if(!text) return;
-            e.channel.send(JSON.stringify({sender:userId,text}));
-            addChatMessage(userId,text);
-            chatInput.value="";
-          });
-        }
-        // Control events
         if(e.channel.label==="controlChannel"){
           controlChannel = e.channel;
-          remoteVideo.addEventListener("click", ev=>{
-            if(!controlChannel) return;
-            controlChannel.send(JSON.stringify({type:"click", clientX:ev.clientX, clientY:ev.clientY}));
-          });
-          document.addEventListener("keydown", ev=>{
-            if(!controlChannel) return;
-            controlChannel.send(JSON.stringify({type:"keydown", key:ev.key}));
-          });
+
+          // Request control button (for host)
+          const requestBtn = document.createElement("button");
+          requestBtn.innerText="Request Control";
+          requestBtn.style.margin="10px";
+          requestBtn.onclick = ()=>{ controlChannel.send(JSON.stringify({type:"requestControl"})); };
+          document.querySelector(".controls").appendChild(requestBtn);
         }
       };
 
