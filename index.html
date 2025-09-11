@@ -42,8 +42,16 @@
     .fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
     /* fullscreen toggle button */
     #fullscreenBtn{
-      position:absolute;bottom:20px;right:20px;
+      position:absolute;bottom:20px;right:80px;
       background:rgba(0,0,0,0.5);border:none;
+      border-radius:50%;width:48px;height:48px;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;color:#fff;font-size:20px;
+    }
+    /* disconnect button */
+    #disconnectBtn{
+      position:absolute;bottom:20px;right:20px;
+      background:rgba(255,0,0,0.6);border:none;
       border-radius:50%;width:48px;height:48px;
       display:flex;align-items:center;justify-content:center;
       cursor:pointer;color:#fff;font-size:20px;
@@ -67,12 +75,21 @@
     <video id="remoteVideo" autoplay playsinline></video>
     <div id="debugLog" class="status">Waiting for connection...</div>
     <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
+    <button id="disconnectBtn" title="Disconnect">✖</button>
   </div>
 
+  <!-- Invite notification -->
   <div id="inviteNotification" class="notification" style="display:none;">
     <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
     <button id="acceptInvite">Accept</button>
     <button id="declineInvite" class="ghost">Decline</button>
+  </div>
+
+  <!-- Disconnect confirmation -->
+  <div id="disconnectModal" class="notification" style="display:none;">
+    <p>Do you want to end the session?</p>
+    <button id="confirmDisconnect">Yes, End</button>
+    <button id="cancelDisconnect" class="ghost">Cancel</button>
   </div>
 
   <!-- Firebase -->
@@ -111,7 +128,13 @@
     const acceptInviteBtn = document.getElementById('acceptInvite');
     const declineInviteBtn = document.getElementById('declineInvite');
 
-    let sessionId=null, partnerId=null, isHost=false;
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const disconnectModal = document.getElementById('disconnectModal');
+    const confirmDisconnect = document.getElementById('confirmDisconnect');
+    const cancelDisconnect = document.getElementById('cancelDisconnect');
+
+    let sessionId=null, partnerId=null, isHost=false, currentPC=null;
 
     function updateStatus(txt){connStatus.innerText=txt;debugLogEl.innerText=txt;}
 
@@ -156,9 +179,36 @@
       updateStatus("Invitation declined.");
     });
 
+    // ---------------- FULLSCREEN ----------------
+    function showFullscreenButton(flag){fullscreenBtn.style.display=flag?"flex":"none";}
+    fullscreenBtn.addEventListener("click",()=>{document.body.classList.toggle("fullscreen-mode");});
+
+    // ---------------- DISCONNECT ----------------
+    disconnectBtn.addEventListener("click",()=>{disconnectModal.style.display="block";});
+    cancelDisconnect.addEventListener("click",()=>{disconnectModal.style.display="none";});
+    confirmDisconnect.addEventListener("click",async()=>{
+      disconnectModal.style.display="none";
+      updateStatus("Session ended.");
+      if(currentPC){currentPC.close();currentPC=null;}
+      if(sessionId){
+        await db.collection("calls").doc(sessionId).delete();
+      }
+    });
+
+    db.collection("calls").onSnapshot(snap=>{
+      snap.docChanges().forEach(change=>{
+        if(change.type==="removed" && sessionId && change.doc.id===sessionId){
+          updateStatus("Partner ended the session.");
+          if(currentPC){currentPC.close();currentPC=null;}
+          remoteVideo.srcObject=null;
+        }
+      });
+    });
+
     // ---------------- WEBRTC ----------------
     async function startScreenShareAsGuest(sessionId,callerId,calleeId){
-      let pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      currentPC = pc;
       let localStream=await navigator.mediaDevices.getDisplayMedia({video:true});
       localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
 
@@ -178,19 +228,19 @@
         }
       });
       offerCandidates.onSnapshot(snap=>{
-        snap.docChanges().forEach(async ch=>{
-          if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
-        });
+        snap.docChanges().forEach(async ch=>{if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}});
       });
+
       updateStatus("Screen sharing started!");
+      showFullscreenButton(false); // guest doesn't see fullscreen
     }
 
-    // Host listens for remote screen
     db.collection("calls").onSnapshot(snap=>{
       snap.docChanges().forEach(async change=>{
         if(change.type==="added" && isHost && change.doc.id.includes(userId)){
           const data=change.doc.data();
           const pc2=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+          currentPC=pc2;
           const inbound=new MediaStream();
           pc2.ontrack=(ev)=>{ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t));remoteVideo.srcObject=inbound;};
           const ansCand=change.doc.ref.collection("answerCandidates");
@@ -201,14 +251,9 @@
           await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
           ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}})});
           updateStatus("Receiving partner screen...");
+          showFullscreenButton(true); // host sees fullscreen
         }
       });
-    });
-
-    // ---------------- FULLSCREEN TOGGLE ----------------
-    const fullscreenBtn=document.getElementById("fullscreenBtn");
-    fullscreenBtn.addEventListener("click",()=>{
-      document.body.classList.toggle("fullscreen-mode");
     });
   </script>
 </body>
