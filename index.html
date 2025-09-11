@@ -62,8 +62,8 @@ video{width:90%;max-width:1000px;height:100%;border-radius:12px;background:#000;
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script>
-// --- FIREBASE INIT ---
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
@@ -76,115 +76,96 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // --- STATE ---
-const userIdEl = document.getElementById('userId');
+const userIdEl=document.getElementById('userId');
 let userId = localStorage.getItem('abhi_userid') || Math.floor(100000000000 + Math.random()*900000000000).toString();
-localStorage.setItem('abhi_userid', userId);
-userIdEl.innerText = userId;
+localStorage.setItem('abhi_userid',userId);
+userIdEl.innerText=userId;
 
-const partnerInput = document.getElementById('partnerId');
-const inviteBtn = document.getElementById('inviteBtn');
-const createBtn = document.getElementById('createBtn');
-const connStatus = document.getElementById('connStatus');
-const debugLogEl = document.getElementById('debugLog');
-const remoteVideo = document.getElementById('remoteVideo');
+const partnerInput=document.getElementById('partnerId');
+const inviteBtn=document.getElementById('inviteBtn');
+const createBtn=document.getElementById('createBtn');
+const connStatus=document.getElementById('connStatus');
+const debugLogEl=document.getElementById('debugLog');
+const remoteVideo=document.getElementById('remoteVideo');
 
-const inviteNotificationEl = document.getElementById('inviteNotification');
-const inviteUserEl = document.getElementById('inviteUser');
-const acceptInviteBtn = document.getElementById('acceptInvite');
-const declineInviteBtn = document.getElementById('declineInvite');
+const inviteNotificationEl=document.getElementById('inviteNotification');
+const inviteUserEl=document.getElementById('inviteUser');
+const acceptInviteBtn=document.getElementById('acceptInvite');
+const declineInviteBtn=document.getElementById('declineInvite');
 
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-const disconnectBtn = document.getElementById('disconnectBtn');
-const disconnectModal = document.getElementById('disconnectModal');
-const confirmDisconnect = document.getElementById('confirmDisconnect');
-const cancelDisconnect = document.getElementById('cancelDisconnect');
+const fullscreenBtn=document.getElementById('fullscreenBtn');
+const disconnectBtn=document.getElementById('disconnectBtn');
+const disconnectModal=document.getElementById('disconnectModal');
+const confirmDisconnect=document.getElementById('confirmDisconnect');
+const cancelDisconnect=document.getElementById('cancelDisconnect');
 
-let sessionId = null, partnerId = null, isHost = false, currentPC = null;
+let sessionId=null, partnerId=null, isHost=false, currentPC=null;
 
-// --- UTILITY ---
-function updateStatus(txt){
-  connStatus.innerText = txt;
-  debugLogEl.innerText = txt;
-}
+function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
 
 // --- INVITE ---
-inviteBtn.addEventListener('click', async () => {
-  const pid = partnerInput.value.trim();
-  if (!pid || pid === userId) { alert("Enter valid partner ID"); return; }
-  partnerId = pid;
-  isHost = true;
-  sessionId = `${userId}_${partnerId}_${Date.now()}`;
+inviteBtn.addEventListener('click', async()=>{
+  const pid=partnerInput.value.trim();
+  if(!pid||pid===userId){alert("Enter valid partner ID");return;}
+  partnerId=pid; isHost=true;
+  sessionId=`${userId}_${partnerId}_${Date.now()}`;
   await db.collection("invites").doc(partnerId).set({
-    senderId: userId,
-    sessionId,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    status: "pending"
+    senderId:userId,sessionId,timestamp:firebase.firestore.FieldValue.serverTimestamp(),status:"pending"
   });
   updateStatus("Invitation sent — waiting...");
 });
 
-createBtn.addEventListener('click', () => {
-  userId = Math.floor(100000000000 + Math.random()*900000000000).toString();
-  localStorage.setItem('abhi_userid', userId);
-  userIdEl.innerText = userId;
-  updateStatus("New ID ready.");
+createBtn.addEventListener('click', ()=>{
+  userId=Math.floor(100000000000 + Math.random()*900000000000).toString();
+  localStorage.setItem('abhi_userid',userId);
+  userIdEl.innerText=userId; updateStatus("New ID ready.");
 });
 
 // --- LISTEN INVITES ---
-db.collection("invites").doc(userId).onSnapshot(async snap => {
-  const data = snap.data();
-  if (data && data.status === "pending") {
-    inviteUserEl.innerText = data.senderId;
-    inviteNotificationEl.style.display = "block";
-    sessionId = data.sessionId;
-    partnerId = data.senderId;
-    isHost = false;
-  } else inviteNotificationEl.style.display = "none";
+db.collection("invites").doc(userId).onSnapshot(async snap=>{
+  const data=snap.data();
+  if(data && data.status==="pending"){
+    inviteUserEl.innerText=data.senderId;
+    inviteNotificationEl.style.display="block";
+    sessionId=data.sessionId; partnerId=data.senderId; isHost=false;
+  } else inviteNotificationEl.style.display="none";
 });
 
 // --- ACCEPT / DECLINE ---
-acceptInviteBtn.addEventListener("click", async () => {
-  inviteNotificationEl.style.display = "none";
-  if (!sessionId) return;
+acceptInviteBtn.addEventListener("click",async()=>{
+  inviteNotificationEl.style.display="none";
+  if(!sessionId)return;
   await db.collection("invites").doc(userId).delete();
   updateStatus("Starting screen share...");
-  startScreenShareAsGuest(sessionId, partnerId, userId);
+  startScreenShareAsGuest(sessionId,partnerId,userId);
 });
-declineInviteBtn.addEventListener("click", async () => {
-  inviteNotificationEl.style.display = "none";
+declineInviteBtn.addEventListener("click",async()=>{
+  inviteNotificationEl.style.display="none";
   await db.collection("invites").doc(userId).delete();
   updateStatus("Invitation declined.");
 });
 
 // --- FULLSCREEN ---
-fullscreenBtn.addEventListener("click", () => {
-  document.body.classList.toggle("fullscreen-mode");
-});
-function showFullscreenButton(flag) {
-  fullscreenBtn.style.display = flag ? "flex" : "none";
-}
+fullscreenBtn.addEventListener("click",()=>{document.body.classList.toggle("fullscreen-mode");});
+function showFullscreenButton(flag){fullscreenBtn.style.display=flag?"flex":"none";}
 
 // --- DISCONNECT ---
-async function endSession(notifyOther = true){
+async function endSession(notifyOther=true){
   updateStatus("Session ended.");
-  if(currentPC){currentPC.close(); currentPC = null;}
-  remoteVideo.srcObject = null;
-  if(sessionId && notifyOther){
-    await db.collection("calls").doc(sessionId).delete();
-  }
-  sessionId = null; partnerId = null; isHost = false;
+  if(currentPC){currentPC.close(); currentPC=null;}
+  remoteVideo.srcObject=null;
+  if(sessionId && notifyOther) await db.collection("calls").doc(sessionId).delete();
+  sessionId=null; partnerId=null; isHost=false;
 }
 
-// Confirm modal
-disconnectBtn.addEventListener("click", ()=>{disconnectModal.style.display = "block";});
-cancelDisconnect.addEventListener("click", ()=>{disconnectModal.style.display = "none";});
-confirmDisconnect.addEventListener("click", async ()=>{
-  disconnectModal.style.display = "none";
+disconnectBtn.addEventListener("click",()=>{disconnectModal.style.display="block";});
+cancelDisconnect.addEventListener("click",()=>{disconnectModal.style.display="none";});
+confirmDisconnect.addEventListener("click",async()=>{
+  disconnectModal.style.display="none";
   await endSession(true);
 });
 
 // --- FIRESTORE SESSION LISTENER ---
-// Propagate disconnect to other side
 db.collection("calls").onSnapshot(snap=>{
   snap.docChanges().forEach(change=>{
     if(change.type==="removed" && sessionId && change.doc.id===sessionId){
@@ -194,18 +175,19 @@ db.collection("calls").onSnapshot(snap=>{
   });
 });
 
-// --- WEBRTC GUEST ---
-async function startScreenShareAsGuest(sessionId, callerId, calleeId){
+// --- WEBRTC ---
+// Guest
+async function startScreenShareAsGuest(sessionId,callerId,calleeId){
   const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-  currentPC = pc;
+  currentPC=pc;
   const localStream = await navigator.mediaDevices.getDisplayMedia({video:true});
-  localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
 
-  const callRef = db.collection("calls").doc(sessionId);
-  const offerCandidates = callRef.collection("offerCandidates");
-  const answerCandidates = callRef.collection("answerCandidates");
+  const callRef=db.collection("calls").doc(sessionId);
+  const offerCandidates=callRef.collection("offerCandidates");
+  const answerCandidates=callRef.collection("answerCandidates");
 
-  pc.onicecandidate = e => {if(e.candidate) answerCandidates.add(e.candidate.toJSON());};
+  pc.onicecandidate=e=>{if(e.candidate) answerCandidates.add(e.candidate.toJSON());};
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -223,32 +205,31 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
     });
   });
   updateStatus("Screen sharing started!");
-  showFullscreenButton(true); // ✅ both sides now see toggle
+  showFullscreenButton(false);
 }
 
-// --- WEBRTC HOST ---
+// Host
 db.collection("calls").onSnapshot(snap=>{
   snap.docChanges().forEach(async change=>{
     if(change.type==="added" && isHost && change.doc.id.includes(userId)){
       const data = change.doc.data();
       const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-      currentPC = pc;
+      currentPC=pc;
       const inbound = new MediaStream();
-      pc.ontrack = ev => {ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject = inbound;};
+      pc.ontrack=(ev)=>{ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
       const ansCand = change.doc.ref.collection("answerCandidates");
       const offCand = change.doc.ref.collection("offerCandidates");
-      pc.onicecandidate = e => {if(e.candidate) offCand.add(e.candidate.toJSON());};
+      pc.onicecandidate=e=>{if(e.candidate) offCand.add(e.candidate.toJSON());};
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const ans = await pc.createAnswer(); 
+      const ans = await pc.createAnswer();
       await pc.setLocalDescription(ans);
       await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
       ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added") await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));})});
       updateStatus("Receiving partner screen...");
-      showFullscreenButton(true); // ✅ show toggle for host
+      showFullscreenButton(true);
     }
   });
 });
 </script>
-
 </body>
 </html>
