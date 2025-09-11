@@ -1,138 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>AbhiDesk — Realtime Drawing + Screen Share (Fixed)</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-        :root{--bg:#1a1f30;--accent:#e60073;--secondary:#00aaff;--muted:#b0b6c6;--glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.1)}
-        * { box-sizing:border-box; }
-        body { margin:0;font-family:'Poppins', sans-serif;background:linear-gradient(180deg, #101420, #161a2b);color:#e6eef6;overflow-x:hidden; }
-        .app{max-width:1200px;margin:24px auto;padding:18px;border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow:0 12px 40px rgba(0,0,0,0.5);border:1px solid var(--border)}
-        h1{font-weight:700;letter-spacing:-1px;color:var(--accent);display:flex;align-items:center;gap:8px;}
-        h1:before{content:'';display:block;width:24px;height:24px;background:var(--accent);border-radius:50%;animation:pulse 1.5s infinite;}
-        header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
-        .user-pill{background:var(--glass);padding:8px 16px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border)}
-        .controls{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap;border:1px solid var(--border);padding:12px;border-radius:12px;}
-        input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;transition:all 0.3s}
-        input[type=text]:focus{border-color:var(--accent);outline:none;box-shadow:0 0 8px rgba(230,0,115,0.3);}
-        button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.3s;box-shadow:0 4px 10px rgba(230,0,115,0.3)}
-        button:hover{transform:translateY(-2px);box-shadow:0 6px 15px rgba(230,0,115,0.4)}
-        button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);box-shadow:none;}
-        button.ghost:hover{transform:translateY(-2px);background:var(--glass);box-shadow:0 2px 5px rgba(0,0,0,0.2)}
-        .canvas-wrap{display:grid;grid-template-columns:1fr 360px;gap:24px;margin-top:24px}
-        #canvas{border-radius:12px;background:#fff;touch-action:none;display:block;max-width:100%;box-shadow:0 8px 20px rgba(0,0,0,0.2);transition:transform 0.3s;}
-        #canvas.view-only{cursor:not-allowed;transform:scale(0.98);opacity:0.8;}
-        .card{padding:16px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:16px;}
-        .status{font-size:14px;color:var(--muted);margin-top:8px;}
-        video{width:100%;border-radius:12px;background:#000;border:1px solid var(--border);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
-        input[type="color"]{appearance:none;width:32px;height:32px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:transform 0.2s;}
-        input[type="color"]::-webkit-color-swatch-wrapper{padding:0;}
-        input[type="color"]::-webkit-color-swatch{border:none;border-radius:6px;}
-        input[type="color"]:hover{transform:scale(1.1);}
-        input[type="range"]{width:120px;cursor:pointer;accent-color:var(--accent);}
-        .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-        .toolbar > div{display:flex;align-items:center;gap:8px;}
-        .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;box-shadow:0 8px 30px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;border:1px solid var(--border);animation:fadeIn 0.5s;}
-        @keyframes fadeIn{from{opacity:0;transform:translate(-50%,-40%);}to{opacity:1;transform:translate(-50%,-50%);}}
-        @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(230,0,115,0.5);}70%{box-shadow:0 0 0 10px rgba(230,0,115,0);}100%{box-shadow:0 0 0 0 rgba(230,0,115,0);}}
-        @media(max-width:1024px){.canvas-wrap{grid-template-columns:1fr}}
-    </style>
+  <meta charset="utf-8" />
+  <title>AbhiDesk — Screen Share Only</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+    :root{
+      --bg:#1a1f30;--accent:#e60073;--secondary:#00aaff;--muted:#b0b6c6;
+      --glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.1)
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:'Poppins',sans-serif;
+      background:linear-gradient(180deg,#101420,#161a2b);
+      color:#e6eef6;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
+    header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border);}
+    h1{font-weight:700;color:var(--accent);margin:0;}
+    .user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border)}
+    .controls{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);}
+    input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;}
+    button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+    .main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;}
+    video{width:90%;max-width:1000px;height:auto;border-radius:12px;background:#000;border:1px solid var(--border);}
+    .status{margin-top:10px;color:var(--muted);}
+    .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);
+      border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;
+      transform:translate(-50%,-50%);z-index:1000;text-align:center;}
+  </style>
 </head>
 <body>
-    <div class="app">
-        <header>
-            <div>
-                <h1>AbhiDesk 🚀</h1>
-                <div class="status">Realtime collaborative whiteboard</div>
-            </div>
-            <div>
-                <div class="user-pill">Your ID: <span id="userId">...</span></div>
-            </div>
-        </header>
+  <header>
+    <h1>AbhiDesk 🚀</h1>
+    <div class="user-pill">Your ID: <span id="userId">...</span></div>
+  </header>
 
-        <div class="controls">
-            <div style="display:flex;gap:8px;align-items:center;">
-                <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
-                <button id="inviteBtn">Invite</button>
-                <button id="createBtn" class="ghost">New ID</button>
-            </div>
-            <div style="margin-left:auto"><div id="connStatus" class="status">Ready to connect...</div></div>
-        </div>
+  <div class="controls">
+    <input id="partnerId" type="text" placeholder="Partner ID (paste here)">
+    <button id="inviteBtn">Invite</button>
+    <button id="createBtn" class="ghost">New ID</button>
+    <div id="connStatus" class="status">Ready to connect...</div>
+  </div>
 
-        <div class="canvas-wrap">
-            <div class="card">
-                <div class="toolbar">
-                    <div>
-                        <label>Color</label>
-                        <input id="color" type="color" value="#000000">
-                    </div>
-                    <div>
-                        <label>Width</label>
-                        <input id="width" type="range" min="1" max="20" value="2">
-                    </div>
-                    <button id="eraseBtn" class="ghost">Eraser</button>
-                    <button id="clearBtn" class="ghost">Clear</button>
-                    <button id="exportBtn">Export PNG</button>
-                </div>
+  <div class="main">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div id="debugLog" class="status">Waiting for connection...</div>
+  </div>
 
-                <div style="margin-top:16px">
-                    <canvas id="canvas" width="1000" height="600"></canvas>
-                </div>
-            </div>
+  <div id="inviteNotification" class="notification" style="display:none;">
+    <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
+    <button id="acceptInvite">Accept</button>
+    <button id="declineInvite" class="ghost">Decline</button>
+  </div>
 
-            <aside>
-                <div class="card">
-                    <strong>Screen Share</strong>
-                    <div style="margin-top:12px;">
-                        <button id="startShare">Start Screen Share</button>
-                        <button id="stopShare" class="ghost" disabled>Stop Share</button>
-                    </div>
-                    <div style="margin-top:12px;">
-                        <label class="status">Remote Screen:</label>
-                        <video id="remoteVideo" autoplay playsinline></video>
-                    </div>
-                </div>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-                <div class="card">
-                    <strong>Session Status</strong>
-                    <div id="debugLog" style="margin-top:8px;" class="status">Waiting for connection...</div>
-                </div>
-            </aside>
-        </div>
-    </div>
-
-    <div id="inviteNotification" class="notification" style="display:none;">
-        <p><strong id="inviteUser"></strong> has invited you to a drawing session.</p>
-        <div style="display:flex;gap:12px;">
-            <button id="acceptInvite">Accept</button>
-            <button id="declineInvite" class="ghost">Decline</button>
-        </div>
-    </div>
-
-    <!-- Firebase Compat SDKs (we're using compat API surface for simplicity) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-    <script>
-    // ------------------ CONFIG & INIT ------------------
+  <script>
+    // ---------------- CONFIG ----------------
     const firebaseConfig = {
       apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
       authDomain: "abhidesk-d26d0.firebaseapp.com",
       projectId: "abhidesk-d26d0",
       storageBucket: "abhidesk-d26d0.appspot.com",
       messagingSenderId: "924205685340",
-      appId: "1:924205685340:web:b33b4dfa2be1da2696a499",
-      measurementId: "G-ML9D0LTM0D"
+      appId: "1:924205685340:web:b33b4dfa2be1da2696a499"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ------------------ UI & STATE ------------------
+    // ---------------- STATE ----------------
     const userIdEl = document.getElementById('userId');
+    function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
     let userId = localStorage.getItem('abhi_userid') || generateId();
-    function generateId() { return Math.random().toString(36).substring(2, 9); }
     localStorage.setItem('abhi_userid', userId);
     userIdEl.innerText = userId;
 
@@ -141,17 +82,6 @@
     const createBtn = document.getElementById('createBtn');
     const connStatus = document.getElementById('connStatus');
     const debugLogEl = document.getElementById('debugLog');
-
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const colorInput = document.getElementById('color');
-    const widthInput = document.getElementById('width');
-    const eraseBtn = document.getElementById('eraseBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const exportBtn = document.getElementById('exportBtn');
-
-    const startShareBtn = document.getElementById('startShare');
-    const stopShareBtn = document.getElementById('stopShare');
     const remoteVideo = document.getElementById('remoteVideo');
 
     const inviteNotificationEl = document.getElementById('inviteNotification');
@@ -159,433 +89,99 @@
     const acceptInviteBtn = document.getElementById('acceptInvite');
     const declineInviteBtn = document.getElementById('declineInvite');
 
-    // CORE STATE
-    let sessionStrokesCache = []; // local cache of strokes for the active session
-    let remoteStrokesMap = {}; // kept for backwards compatibility if needed
-    let currentStroke = null;
-    let drawing = false, lastX = 0, lastY = 0;
-    let partnerId = null;
-    let sessionId = null;
-    let isHost = false; // Is this user the host of the session?
-    let hostStrokesListener = null;
+    let sessionId=null, partnerId=null, isHost=false;
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    function updateStatus(txt){connStatus.innerText=txt;debugLogEl.innerText=txt;}
 
-    // ------------------ UI HELPERS ------------------
-    function updateStatus(text, isError = false) {
-        connStatus.innerText = text;
-        connStatus.style.color = isError ? '#ff4d4f' : 'var(--muted)';
-        debugLogEl.innerText = text;
-    }
+    // ---------------- INVITE ----------------
+    inviteBtn.addEventListener('click', async()=>{
+      const pid=partnerInput.value.trim();
+      if(!pid||pid===userId){alert("Enter valid partner ID");return;}
+      partnerId=pid;isHost=true;
+      sessionId=`${userId}_${partnerId}_${Date.now()}`;
+      await db.collection("invites").doc(partnerId).set({
+        senderId:userId,sessionId,timestamp:firebase.firestore.FieldValue.serverTimestamp(),status:"pending"
+      });
+      updateStatus("Invitation sent — waiting...");
+    });
 
-    function setDrawingMode(isAllowed) {
-        if (isAllowed) {
-            canvas.classList.remove('view-only');
-            canvas.addEventListener('mousedown', pointerDown);
-            canvas.addEventListener('mousemove', pointerMove);
-            canvas.addEventListener('mouseup', pointerUp);
-            canvas.addEventListener('mouseleave', pointerUp);
-            canvas.addEventListener('touchstart', pointerDown, { passive: false });
-            canvas.addEventListener('touchmove', pointerMove, { passive: false });
-            canvas.addEventListener('touchend', pointerUp);
-            colorInput.disabled = false;
-            widthInput.disabled = false;
-            eraseBtn.disabled = false;
-            clearBtn.disabled = false;
-        } else {
-            canvas.classList.add('view-only');
-            canvas.removeEventListener('mousedown', pointerDown);
-            canvas.removeEventListener('mousemove', pointerMove);
-            canvas.removeEventListener('mouseup', pointerUp);
-            canvas.removeEventListener('mouseleave', pointerUp);
-            canvas.removeEventListener('touchstart', pointerDown);
-            canvas.removeEventListener('touchmove', pointerMove);
-            canvas.removeEventListener('touchend', pointerUp);
-            colorInput.disabled = true;
-            widthInput.disabled = true;
-            eraseBtn.disabled = true;
-            clearBtn.disabled = true;
+    createBtn.addEventListener('click', ()=>{
+      userId=generateId();localStorage.setItem('abhi_userid',userId);
+      userIdEl.innerText=userId;updateStatus("New ID ready.");
+    });
+
+    // Listen for incoming invites
+    db.collection("invites").doc(userId).onSnapshot(async snap=>{
+      const data=snap.data();
+      if(data&&data.status==="pending"){
+        inviteUserEl.innerText=data.senderId;
+        inviteNotificationEl.style.display="block";
+        sessionId=data.sessionId;partnerId=data.senderId;isHost=false;
+      }else{inviteNotificationEl.style.display="none";}
+    });
+
+    // ---------------- ACCEPT / DECLINE ----------------
+    acceptInviteBtn.addEventListener("click",async()=>{
+      inviteNotificationEl.style.display="none";
+      if(!sessionId)return;
+      await db.collection("invites").doc(userId).delete();
+      updateStatus("Starting screen share...");
+      startScreenShareAsGuest(sessionId,partnerId,userId);
+    });
+    declineInviteBtn.addEventListener("click",async()=>{
+      inviteNotificationEl.style.display="none";
+      await db.collection("invites").doc(userId).delete();
+      updateStatus("Invitation declined.");
+    });
+
+    // ---------------- WEBRTC ----------------
+    async function startScreenShareAsGuest(sessionId,callerId,calleeId){
+      let pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      let localStream=await navigator.mediaDevices.getDisplayMedia({video:true});
+      localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+
+      const callRef=db.collection("calls").doc(sessionId);
+      const offerCandidates=callRef.collection("offerCandidates");
+      const answerCandidates=callRef.collection("answerCandidates");
+      pc.onicecandidate=e=>{if(e.candidate)answerCandidates.add(e.candidate.toJSON());};
+
+      const offer=await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await callRef.set({offer:{type:offer.type,sdp:offer.sdp},caller:callerId,callee:calleeId});
+
+      callRef.onSnapshot(async snap=>{
+        const data=snap.data();
+        if(data&&data.answer&&!pc.currentRemoteDescription){
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
         }
-    }
-    setDrawingMode(true); // Default to a drawing mode for the local user
-
-    // ------------------ CANVAS & DRAWING LOGIC ------------------
-    function fitCanvas() {
-        const parentWidth = Math.min(1000, document.querySelector('.card').clientWidth - 32);
-        const aspect = 1000 / 600;
-        canvas.width = parentWidth;
-        canvas.height = Math.round(parentWidth / aspect);
-        // redraw existing strokes after resize
-        redrawAll();
-    }
-    window.addEventListener('resize', fitCanvas);
-    fitCanvas();
-
-    function redrawAll() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (sessionStrokesCache && sessionStrokesCache.length) {
-            sessionStrokesCache.forEach(st => drawStroke(st));
-        }
-    }
-
-    function toNormalized(x, y) {
-        const nx = Math.round((x / canvas.width) * 1000);
-        const ny = Math.round((y / canvas.height) * 600);
-        return { x: nx, y: ny };
-    }
-
-    function drawStroke(st) {
-        if (!st || !st.points || st.points.length === 0) return;
-        ctx.save();
-        // Respect stroke width but scale proportionally to canvas width
-        const scaleFactor = (canvas.width / 1000 + canvas.height / 600) / 2;
-        ctx.lineWidth = (st.width || 2) * scaleFactor;
-        ctx.strokeStyle = st.color || '#000';
-        ctx.beginPath();
-        ctx.moveTo(st.points[0].x * (canvas.width / 1000), st.points[0].y * (canvas.height / 600));
-        for (let i = 1; i < st.points.length; i++) {
-            const p = st.points[i];
-            ctx.lineTo(p.x * (canvas.width / 1000), p.y * (canvas.height / 600));
-        }
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    function pointerDown(e) {
-        e.preventDefault();
-        drawing = true;
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-        currentStroke = { color: colorInput.value, width: parseInt(widthInput.value, 10), points: [toNormalized(x, y)] };
-        lastX = x; lastY = y;
-    }
-
-    function pointerMove(e) {
-        if (!drawing || !isHost) return; // Only host can draw
-        e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-        currentStroke.points.push(toNormalized(x, y));
-        ctx.save();
-        ctx.lineWidth = parseInt(widthInput.value, 10);
-        ctx.strokeStyle = colorInput.value;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        ctx.restore();
-        lastX = x; lastY = y;
-    }
-
-    async function pointerUp() {
-        if (!drawing || !isHost) return;
-        drawing = false;
-        if (currentStroke && sessionId) {
-            try {
-                const ref = db.collection('sessions').doc(sessionId);
-                await ref.update({ strokes: firebase.firestore.FieldValue.arrayUnion(currentStroke) });
-            } catch (err) {
-                console.error('Firestore write error:', err);
-                updateStatus('Firestore write failed.', true);
-            }
-        }
-        currentStroke = null;
-    }
-
-    // ------------------ FIRESTORE & SESSION LOGIC ------------------
-    async function startListeningForStrokes() {
-        if (!sessionId || hostStrokesListener) return;
-        const ref = db.collection('sessions').doc(sessionId);
-        sessionStrokesCache = [];
-        hostStrokesListener = ref.onSnapshot(docSnap => {
-            if (!docSnap.exists) {
-                sessionStrokesCache = [];
-                redrawAll();
-                return;
-            }
-            const data = docSnap.data() || {};
-            const strokes = data.strokes || [];
-
-            // Handle clear / reset
-            if (!strokes.length && sessionStrokesCache.length) {
-                sessionStrokesCache = [];
-                redrawAll();
-            }
-
-            // If new strokes were appended, draw only the new ones
-            if (strokes.length > sessionStrokesCache.length) {
-                for (let i = sessionStrokesCache.length; i < strokes.length; i++) {
-                    drawStroke(strokes[i]);
-                }
-                sessionStrokesCache = strokes.slice();
-            }
-
-            // Update status if session status changed
-            if (data.status) {
-                if (data.status === 'active') {
-                    updateStatus('Session active — connected.');
-                } else {
-                    updateStatus('Session: ' + data.status);
-                }
-            }
-        }, err => {
-            console.error('onSnapshot error:', err);
-            updateStatus('Firestore listen failed (check rules / domain)', true);
+      });
+      offerCandidates.onSnapshot(snap=>{
+        snap.docChanges().forEach(async ch=>{
+          if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
         });
-        console.log('Listening to session:', sessionId);
+      });
+      updateStatus("Screen sharing started!");
     }
 
-    async function stopListeningForStrokes() {
-        if (hostStrokesListener) {
-            hostStrokesListener();
-            hostStrokesListener = null;
+    // Host listens for remote screen
+    db.collection("calls").onSnapshot(snap=>{
+      snap.docChanges().forEach(async change=>{
+        if(change.type==="added" && isHost && change.doc.id.includes(userId)){
+          const data=change.doc.data();
+          const pc2=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+          const inbound=new MediaStream();
+          pc2.ontrack=(ev)=>{ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t));remoteVideo.srcObject=inbound;};
+          const ansCand=change.doc.ref.collection("answerCandidates");
+          const offCand=change.doc.ref.collection("offerCandidates");
+          pc2.onicecandidate=e=>{if(e.candidate)offCand.add(e.candidate.toJSON());};
+          await pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const ans=await pc2.createAnswer();await pc2.setLocalDescription(ans);
+          await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
+          ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}})});
+          updateStatus("Receiving partner screen...");
         }
-        sessionStrokesCache = [];
-    }
-
-    async function createNewSession(partnerIdParam, status) {
-        const id = `${userId}_${partnerIdParam}_${Date.now()}`;
-        try {
-            const sessionRef = db.collection('sessions').doc(id);
-            await sessionRef.set({
-                hostId: userId,
-                guestId: partnerIdParam,
-                status: status,
-                strokes: [],
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            sessionId = id;
-            // start listening immediately so both host and guest get updates
-            startListeningForStrokes();
-            updateStatus('Session created. Waiting for partner to accept...');
-            console.log('Created session:', id);
-            return id;
-        } catch (e) {
-            console.error('Error creating session:', e);
-            updateStatus('Failed to create session.', true);
-            return null;
-        }
-    }
-
-    // ------------------ INVITATION FLOW ------------------
-    inviteBtn.addEventListener('click', async () => {
-        const pid = partnerInput.value.trim();
-        if (!pid) { alert('Please enter a partner ID.'); return; }
-        if (pid === userId) { alert('You cannot invite yourself.'); return; }
-
-        partnerId = pid;
-        isHost = true;
-        setDrawingMode(true);
-        updateStatus(`Creating session and sending invitation to ${partnerId}...`);
-
-        // Create session first, then create invite containing sessionId
-        const sid = await createNewSession(partnerId, 'pending');
-        if (!sid) return;
-        try {
-            const inviteRef = db.collection('invites').doc(partnerId);
-            await inviteRef.set({
-                senderId: userId,
-                sessionId: sid,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'pending'
-            });
-            updateStatus('Invitation sent — waiting for partner to accept...');
-        } catch (e) {
-            console.error('Invite send error:', e);
-            updateStatus('Failed to send invite.', true);
-        }
+      });
     });
-
-    createBtn.addEventListener('click', () => {
-        userId = generateId();
-        localStorage.setItem('abhi_userid', userId);
-        userIdEl.innerText = userId;
-        updateStatus('New ID created. Ready to connect.');
-        // Reset all state
-        partnerId = null;
-        sessionId = null;
-        isHost = false;
-        stopListeningForStrokes();
-        stopScreenShare();
-        setDrawingMode(true);
-    });
-
-    // Listen for incoming invitations for this user
-    db.collection('invites').doc(userId).onSnapshot(async (docSnap) => {
-        const data = docSnap.data();
-        if (data && data.status === 'pending') {
-            inviteUserEl.innerText = data.senderId;
-            inviteNotificationEl.style.display = 'flex';
-        } else {
-            inviteNotificationEl.style.display = 'none';
-        }
-    });
-
-    acceptInviteBtn.addEventListener('click', async () => {
-        inviteNotificationEl.style.display = 'none';
-        const inviteRef = db.collection('invites').doc(userId);
-        const data = (await inviteRef.get()).data();
-        if (!data || data.status !== 'pending') return;
-
-        // Guest joins session — use sessionId stored in invite
-        isHost = false;
-        partnerId = data.senderId;
-        setDrawingMode(false);
-        updateStatus(`Accepted invitation from ${partnerId}. You are in view-only mode.`);
-
-        if (data.sessionId) {
-            sessionId = data.sessionId;
-            // mark session active and set guestId
-            try {
-                await db.collection('sessions').doc(sessionId).update({ status: 'active', guestId: userId });
-            } catch (e) { console.warn('Failed to update session active:', e); }
-            // Start listening for strokes and for incoming screen-share
-            startListeningForStrokes();
-            startScreenShareAsGuest(partnerId, userId);
-        } else {
-            updateStatus('Invite does not contain a session id. Cannot join.', true);
-        }
-
-        // remove invite doc (clean up)
-        await inviteRef.delete();
-    });
-
-    declineInviteBtn.addEventListener('click', async () => {
-        inviteNotificationEl.style.display = 'none';
-        const inviteRef = db.collection('invites').doc(userId);
-        const data = (await inviteRef.get()).data();
-        if (data && data.sessionId) {
-            try {
-                await db.collection('sessions').doc(data.sessionId).update({ status: 'declined' }).catch(()=>{});
-            } catch (e) { console.warn('Could not update session status on decline:', e); }
-        }
-        await inviteRef.delete();
-        updateStatus('Invitation declined.');
-    });
-
-    // ------------------ CANVAS TOOLS ------------------
-    eraseBtn.addEventListener('click', () => { colorInput.value = '#ffffff'; });
-    clearBtn.addEventListener('click', async () => {
-        if (!isHost || !sessionId) return;
-        try {
-            await db.collection('sessions').doc(sessionId).update({ strokes: [] });
-            // snapshot listener will clear local canvas
-            updateStatus('Canvas cleared.');
-        } catch (e) {
-            console.error('Clear error:', e);
-            updateStatus('Failed to clear canvas.', true);
-        }
-    });
-    exportBtn.addEventListener('click', () => {
-        const url = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `board_${Date.now()}.png`;
-        a.click();
-    });
-
-    // ------------------ WEBRTC SCREEN SHARE ------------------
-    let pc = null, localStream = null, callDocRef = null;
-
-    async function stopScreenShare() {
-        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-        if (pc) { pc.close(); pc = null; }
-        startShareBtn.disabled = false;
-        stopShareBtn.disabled = true;
-        updateStatus('Screen share stopped.');
-    }
-    stopShareBtn.addEventListener('click', stopScreenShare);
-
-    // Host starts screen share
-    startShareBtn.addEventListener('click', async () => {
-        if (!isHost || !partnerId || !sessionId) { alert('You must be the host and connected to a partner to start sharing.'); return; }
-        startShareBtn.disabled = true;
-        stopShareBtn.disabled = false;
-        try {
-            localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-        } catch (e) {
-            alert('Screen share denied or not supported.');
-            startShareBtn.disabled = false;
-            stopShareBtn.disabled = true;
-            return;
-        }
-
-        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-        // Create call doc
-        callDocRef = db.collection('calls').doc(sessionId);
-        const offerCandidates = callDocRef.collection('offerCandidates');
-        const answerCandidates = callDocRef.collection('answerCandidates');
-
-        pc.onicecandidate = e => { if (e.candidate) offerCandidates.add(e.candidate.toJSON()); };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await callDocRef.set({ offer: { type: offer.type, sdp: offer.sdp }, caller: userId, callee: partnerId });
-        
-        callDocRef.onSnapshot(async snap => {
-            const data = snap.data();
-            if (data && data.answer && pc && !pc.currentRemoteDescription) {
-                await pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(()=>{});
-            }
-        });
-        answerCandidates.onSnapshot(snap => {
-            snap.docChanges().forEach(async ch => {
-                if (ch.type === 'added') {
-                    try { await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch (e) { console.error(e); }
-                }
-            });
-        });
-
-        localStream.getVideoTracks()[0].onended = () => { stopScreenShare(); };
-        updateStatus('Screen share started. Your partner can now see your screen.');
-    });
-
-    // Guest listens for incoming calls
-    async function startScreenShareAsGuest(callerId, calleeId) {
-        const callsCol = db.collection('calls');
-        callsCol.where('callee', '==', calleeId).onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(async change => {
-                if (change.type === 'added' && change.doc.id.includes(callerId)) {
-                    const data = change.doc.data();
-                    if (!data) return;
-                    const remoteCallRef = db.collection('calls').doc(change.doc.id);
-                    const offer = data.offer;
-                    const pc2 = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-                    const inboundStream = new MediaStream();
-                    pc2.ontrack = (evt) => {
-                        evt.streams[0].getTracks().forEach(t => inboundStream.addTrack(t));
-                        remoteVideo.srcObject = inboundStream;
-                    };
-                    const answerCandidates = remoteCallRef.collection('answerCandidates');
-                    const offerCandidates = remoteCallRef.collection('offerCandidates');
-                    pc2.onicecandidate = e => { if (e.candidate) answerCandidates.add(e.candidate.toJSON()); };
-                    await pc2.setRemoteDescription(new RTCSessionDescription(offer));
-                    const answer = await pc2.createAnswer();
-                    await pc2.setLocalDescription(answer);
-                    await remoteCallRef.update({ answer: { type: answer.type, sdp: answer.sdp } });
-                    offerCandidates.onSnapshot(snap2 => {
-                        snap2.docChanges().forEach(async ch => {
-                            if (ch.type === 'added') {
-                                try { await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data())); } catch (e) { console.error(e); }
-                            }
-                        });
-                    });
-                    updateStatus(`Receiving screen-share from ${data.caller}.`);
-                }
-            });
-        });
-    }
-
-    // Clean up when leaving page
-    window.addEventListener('beforeunload', () => {
-        stopScreenShare();
-        stopListeningForStrokes();
-    });
-    </script>
+  </script>
 </body>
 </html>
