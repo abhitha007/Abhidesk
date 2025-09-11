@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AbhiDesk — Screen Share + Chat</title>
+<title>AbhiDesk — Screen Share + Chat + Remote Control</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-
 :root{
   --bg:#1a1f30;
   --accent:#e60073;
@@ -15,7 +14,6 @@
   --glass:rgba(255,255,255,0.05);
   --border:rgba(255,255,255,0.1);
 }
-
 *{box-sizing:border-box;}
 body{
   margin:0;
@@ -27,7 +25,6 @@ body{
   flex-direction:column;
   height:100vh;
 }
-
 header{
   display:flex;
   justify-content:space-between;
@@ -36,151 +33,25 @@ header{
   border-bottom:1px solid var(--border);
   flex-shrink:0;
 }
-
-h1{
-  font-weight:700;
-  color:var(--accent);
-  margin:0;
-}
-
-.user-pill{
-  background:var(--glass);
-  padding:6px 14px;
-  border-radius:999px;
-  color:var(--secondary);
-  font-weight:600;
-  border:1px solid var(--border);
-}
-
-.controls{
-  display:flex;
-  gap:12px;
-  align-items:center;
-  padding:12px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-  flex-wrap:wrap;
-}
-
-input[type=text]{
-  padding:10px;
-  border-radius:10px;
-  border:1px solid var(--border);
-  background:rgba(0,0,0,0.2);
-  color:inherit;
-  min-width:240px;
-}
-
-button{
-  background:var(--accent);
-  color:#fff;
-  border:0;
-  padding:10px 18px;
-  border-radius:10px;
-  cursor:pointer;
-  font-weight:600;
-  transition:all 0.2s ease;
-}
-
+h1{ font-weight:700; color:var(--accent); margin:0;}
+.user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border);}
+.controls{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
+button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;transition:all 0.2s ease;}
 button:hover{opacity:0.85;}
-button.ghost{
-  background:transparent;
-  border:1px solid var(--border);
-  color:var(--muted);
-}
-
-.main{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  padding:20px;
-  position:relative;
-  overflow-y:auto;
-}
-
-video{
-  width:90%;
-  max-width:800px;
-  height:auto;
-  aspect-ratio:16/9;
-  border-radius:12px;
-  background:#000;
-  border:1px solid var(--border);
-  transition:all 0.3s ease;
-}
-
-.status{
-  margin-top:10px;
-  color:var(--muted);
-  text-align:center;
-}
-
-.notification{
-  background:rgba(255,255,255,0.1);
-  backdrop-filter:blur(10px);
-  border-radius:12px;
-  padding:16px;
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  z-index:1000;
-  text-align:center;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity 0.3s ease;
-}
-
-.notification.show{
-  opacity:1;
-  pointer-events:auto;
-}
-
-#chatBox{
-  width:90%;
-  max-width:600px;
-  height:200px;
-  overflow-y:auto;
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:10px;
-  margin-top:10px;
-  background:rgba(0,0,0,0.2);
-}
-
-#chatInput{padding:8px; border-radius:5px; border:1px solid var(--border); width:70%;}
-#sendChat{padding:8px 12px; margin-left:5px;}
-
-.fullscreen-mode header,
-.fullscreen-mode .controls,
-.fullscreen-mode .status{display:none;}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:20px;position:relative;overflow-y:auto;}
+video{width:90%;max-width:800px;height:auto;aspect-ratio:16/9;border-radius:12px;background:#000;border:1px solid var(--border);transition:all 0.3s ease;}
+.status{margin-top:10px;color:var(--muted);text-align:center;}
+.notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;}
+.notification.show{opacity:1;pointer-events:auto;}
+#chatBox{width:90%;max-width:600px;height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:10px;background:rgba(0,0,0,0.2);}
+#chatInput{padding:8px;border-radius:5px;border:1px solid var(--border);width:70%;}
+#sendChat{padding:8px 12px;margin-left:5px;}
+.fullscreen-mode header,.fullscreen-mode .controls,.fullscreen-mode .status{display:none;}
 .fullscreen-mode .main{padding:0;}
-.fullscreen-mode video{
-  width:100%;
-  height:100%;
-  max-width:none;
-  border-radius:0;
-}
-
-#fullscreenBtn{
-  position:absolute;
-  bottom:20px;
-  right:20px;
-  background:rgba(0,0,0,0.5);
-  border:none;
-  border-radius:50%;
-  width:48px;
-  height:48px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  color:#fff;
-  font-size:20px;
-  transition:all 0.2s ease;
-}
+.fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
+#fullscreenBtn{position:absolute;bottom:20px;right:20px;background:rgba(0,0,0,0.5);border:none;border-radius:50%;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:20px;transition:all 0.2s ease;}
 #fullscreenBtn:hover{background:rgba(0,0,0,0.7);}
 </style>
 </head>
@@ -203,21 +74,25 @@ video{
   <div id="debugLog" class="status">Waiting for connection...</div>
 
   <!-- Chat Box -->
-  <div id="chatBox">
-    <div id="chatMessages"></div>
-  </div>
-  <div style="margin-top:5px;">
-    <input id="chatInput" placeholder="Type message...">
-    <button id="sendChat">Send</button>
-  </div>
+  <div id="chatBox"></div>
+  <input type="text" id="chatInput" placeholder="Type message...">
+  <button id="sendChat">Send</button>
 
   <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
 </div>
 
+<!-- Invite notification -->
 <div id="inviteNotification" class="notification">
   <p><strong id="inviteUser"></strong> invited you to share your screen.</p>
   <button id="acceptInvite">Accept</button>
   <button id="declineInvite" class="ghost">Decline</button>
+</div>
+
+<!-- Control permission notification -->
+<div id="controlNotification" class="notification">
+  <p><strong id="controlUser"></strong> wants to control your screen.</p>
+  <button id="acceptControl">Allow</button>
+  <button id="declineControl" class="ghost">Decline</button>
 </div>
 
 <!-- Firebase -->
@@ -225,7 +100,7 @@ video{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-// Firebase
+// ---------------- Firebase ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyDVPnpv5SIIT9gmYdiuDDFGbIt37PWx4vc",
   authDomain: "abhidesk-d26d0.firebaseapp.com",
@@ -237,7 +112,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// State
+// ---------------- State ----------------
 const userIdEl = document.getElementById('userId');
 function generateId(){return Math.floor(100000000000 + Math.random()*900000000000).toString();}
 let userId = localStorage.getItem('abhi_userid') || generateId();
@@ -250,22 +125,28 @@ const createBtn = document.getElementById('createBtn');
 const connStatus = document.getElementById('connStatus');
 const debugLogEl = document.getElementById('debugLog');
 const remoteVideo = document.getElementById('remoteVideo');
+const chatBox = document.getElementById('chatBox');
+const chatInput = document.getElementById('chatInput');
+const sendChat = document.getElementById('sendChat');
 
 const inviteNotificationEl = document.getElementById('inviteNotification');
 const inviteUserEl = document.getElementById('inviteUser');
 const acceptInviteBtn = document.getElementById('acceptInvite');
 const declineInviteBtn = document.getElementById('declineInvite');
 
-const chatInput = document.getElementById('chatInput');
-const sendChat = document.getElementById('sendChat');
-const chatMessages = document.getElementById('chatMessages');
+const controlNotificationEl = document.getElementById('controlNotification');
+const controlUserEl = document.getElementById('controlUser');
+const acceptControlBtn = document.getElementById('acceptControl');
+const declineControlBtn = document.getElementById('declineControl');
 
 let sessionId=null, partnerId=null, isHost=false;
+let controlChannel=null, controlAllowed=false;
 
-// Status helper
+// ---------------- Helpers ----------------
 function updateStatus(txt){connStatus.innerText=txt; debugLogEl.innerText=txt;}
+function addChatMessage(sender, text){chatBox.innerHTML += `<div><b>${sender}:</b> ${text}</div>`; chatBox.scrollTop=chatBox.scrollHeight;}
 
-// --- Invite ---
+// ---------------- Invite ----------------
 inviteBtn.addEventListener('click', async()=>{
   const pid = partnerInput.value.trim();
   if(!pid || pid===userId){alert("Enter valid partner ID"); return;}
@@ -287,14 +168,14 @@ createBtn.addEventListener('click', ()=>{
   updateStatus("New ID ready.");
 });
 
-// Listen for invites
+// Listen for incoming invites
 db.collection("invites").doc(userId).onSnapshot(snap=>{
-  const data=snap.data();
+  const data = snap.data();
   if(data && data.status==="pending"){
-    inviteUserEl.innerText=data.senderId;
+    inviteUserEl.innerText = data.senderId;
     inviteNotificationEl.classList.add("show");
-    sessionId=data.sessionId;
-    partnerId=data.senderId;
+    sessionId = data.sessionId;
+    partnerId = data.senderId;
     isHost=false;
   }else{
     inviteNotificationEl.classList.remove("show");
@@ -315,9 +196,9 @@ declineInviteBtn.addEventListener("click", async()=>{
   updateStatus("Invitation declined.");
 });
 
-// --- WebRTC ---
+// ---------------- WebRTC + Chat + Control ----------------
 async function startScreenShareAsGuest(sessionId, callerId, calleeId){
-  let pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   let localStream;
   try{ localStream = await navigator.mediaDevices.getDisplayMedia({video:true}); }
   catch(err){ updateStatus("Screen sharing denied: "+err.message); return; }
@@ -327,25 +208,43 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
   const offerCandidates = callRef.collection("offerCandidates");
   const answerCandidates = callRef.collection("answerCandidates");
 
-  pc.onicecandidate = e => { if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
+  pc.onicecandidate = e=>{ if(e.candidate) answerCandidates.add(e.candidate.toJSON()); };
 
-  // --- Chat DataChannel ---
+  // Chat
   const chatChannel = pc.createDataChannel("chatChannel");
-  chatChannel.onmessage = e=>{
-    const msg = JSON.parse(e.data);
-    chatMessages.innerHTML += `<div><b>${msg.sender}:</b> ${msg.text}</div>`;
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  };
-
-  sendChat.addEventListener("click", ()=>{
-    const text = chatInput.value.trim();
-    if(!text) return;
-    const message = {sender:userId, text};
-    chatChannel.send(JSON.stringify(message));
-    chatMessages.innerHTML += `<div><b>${userId}:</b> ${text}</div>`;
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  chatChannel.onmessage = e=>{ const msg = JSON.parse(e.data); addChatMessage(msg.sender,msg.text); };
+  sendChat.addEventListener("click", ()=>{ 
+    const text = chatInput.value.trim(); if(!text) return;
+    chatChannel.send(JSON.stringify({sender:userId,text}));
+    addChatMessage(userId,text);
     chatInput.value="";
   });
+
+  // Control channel
+  controlChannel = pc.createDataChannel("controlChannel");
+  controlChannel.onopen = ()=>{ console.log("Control channel ready"); }
+  controlChannel.onmessage = e=>{
+    if(!controlAllowed) return;
+    const msg = JSON.parse(e.data);
+    if(msg.type==="click"){
+      remoteVideo.dispatchEvent(new MouseEvent("click",{clientX:msg.clientX,clientY:msg.clientY,bubbles:true}));
+    }else if(msg.type==="keydown"){
+      document.dispatchEvent(new KeyboardEvent("keydown",{key:msg.key}));
+    }
+  };
+
+  // Control permission
+  controlChannel.onopen = ()=>{
+    controlUserEl.innerText = callerId;
+    controlNotificationEl.classList.add("show");
+  };
+  acceptControlBtn.onclick = ()=>{
+    controlAllowed=true; controlNotificationEl.classList.remove("show");
+  };
+  declineControlBtn.onclick = ()=>{
+    controlAllowed=false; controlNotificationEl.classList.remove("show");
+    controlChannel.close();
+  };
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -357,57 +256,52 @@ async function startScreenShareAsGuest(sessionId, callerId, calleeId){
       await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
     }
   });
-
-  offerCandidates.onSnapshot(snap=>{
-    snap.docChanges().forEach(async ch=>{
-      if(ch.type==="added"){await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
-    });
-  });
-
+  offerCandidates.onSnapshot(snap=>{snap.docChanges().forEach(async ch=>{if(ch.type==="added") await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));});});
   updateStatus("Screen sharing started!");
 }
 
-// Host receives remote screen
+// Host: receive remote screen
 db.collection("calls").onSnapshot(snap=>{
   snap.docChanges().forEach(async change=>{
     if(change.type==="added" && isHost && change.doc.id.includes(userId)){
       const data = change.doc.data();
-      const pc2 = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
       const inbound = new MediaStream();
-      pc2.ontrack = ev => { ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
+      pc.ontrack = ev => { ev.streams[0].getTracks().forEach(t=>inbound.addTrack(t)); remoteVideo.srcObject=inbound; };
+
       const ansCand = change.doc.ref.collection("answerCandidates");
       const offCand = change.doc.ref.collection("offerCandidates");
-      pc2.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
+      pc.onicecandidate = e=>{ if(e.candidate) offCand.add(e.candidate.toJSON()); };
 
-      // Chat DataChannel
-      pc2.ondatachannel = e=>{
-        const chatChannel = e.channel;
-        chatChannel.onmessage = ev=>{
-          const msg = JSON.parse(ev.data);
-          chatMessages.innerHTML += `<div><b>${msg.sender}:</b> ${msg.text}</div>`;
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        };
-        sendChat.addEventListener("click", ()=>{
-          const text = chatInput.value.trim();
-          if(!text) return;
-          const message = {sender:userId, text};
-          chatChannel.send(JSON.stringify(message));
-          chatMessages.innerHTML += `<div><b>${userId}:</b> ${text}</div>`;
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-          chatInput.value="";
-        });
+      // Chat
+      pc.ondatachannel = e=>{
+        if(e.channel.label==="chatChannel"){
+          e.channel.onmessage = ev=>{ const msg=JSON.parse(ev.data); addChatMessage(msg.sender,msg.text); };
+          sendChat.addEventListener("click", ()=>{
+            const text = chatInput.value.trim(); if(!text) return;
+            e.channel.send(JSON.stringify({sender:userId,text}));
+            addChatMessage(userId,text);
+            chatInput.value="";
+          });
+        }
+        // Control events
+        if(e.channel.label==="controlChannel"){
+          controlChannel = e.channel;
+          remoteVideo.addEventListener("click", ev=>{
+            if(!controlChannel) return;
+            controlChannel.send(JSON.stringify({type:"click", clientX:ev.clientX, clientY:ev.clientY}));
+          });
+          document.addEventListener("keydown", ev=>{
+            if(!controlChannel) return;
+            controlChannel.send(JSON.stringify({type:"keydown", key:ev.key}));
+          });
+        }
       };
 
-      await pc2.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const ans = await pc2.createAnswer(); await pc2.setLocalDescription(ans);
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
       await change.doc.ref.update({answer:{type:ans.type,sdp:ans.sdp}});
-
-      ansCand.onSnapshot(ss=>{
-        ss.docChanges().forEach(async ch=>{
-          if(ch.type==="added"){await pc2.addIceCandidate(new RTCIceCandidate(ch.doc.data()));}
-        });
-      });
-
+      ansCand.onSnapshot(ss=>{ss.docChanges().forEach(async ch=>{if(ch.type==="added") await pc.addIceCandidate(new RTCIceCandidate(ch.doc.data()));});});
       updateStatus("Receiving partner screen...");
     }
   });
@@ -416,7 +310,6 @@ db.collection("calls").onSnapshot(snap=>{
 // Fullscreen
 const fullscreenBtn = document.getElementById("fullscreenBtn");
 fullscreenBtn.addEventListener("click", ()=>{ document.body.classList.toggle("fullscreen-mode"); });
-
 </script>
 </body>
 </html>
