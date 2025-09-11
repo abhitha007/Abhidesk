@@ -14,19 +14,40 @@
     body{margin:0;font-family:'Poppins',sans-serif;
       background:linear-gradient(180deg,#101420,#161a2b);
       color:#e6eef6;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
-    header{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border);}
+    header{display:flex;justify-content:space-between;align-items:center;
+      padding:16px;border-bottom:1px solid var(--border);flex-shrink:0;}
     h1{font-weight:700;color:var(--accent);margin:0;}
-    .user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;color:var(--secondary);font-weight:600;border:1px solid var(--border)}
-    .controls{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);}
-    input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
-    button{background:var(--accent);color:#fff;border:0;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:600;}
+    .user-pill{background:var(--glass);padding:6px 14px;border-radius:999px;
+      color:var(--secondary);font-weight:600;border:1px solid var(--border)}
+    .controls{display:flex;gap:12px;align-items:center;padding:12px;
+      border-bottom:1px solid var(--border);flex-shrink:0;}
+    input[type=text]{padding:10px;border-radius:10px;border:1px solid var(--border);
+      background:rgba(0,0,0,0.2);color:inherit;min-width:240px;}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 18px;
+      border-radius:10px;cursor:pointer;font-weight:600;}
     button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
-    .main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;}
-    video{width:90%;max-width:1000px;height:auto;border-radius:12px;background:#000;border:1px solid var(--border);}
+    .main{flex:1;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:20px;position:relative;}
+    video{width:90%;max-width:1000px;height:100%;border-radius:12px;background:#000;
+      border:1px solid var(--border);transition:all 0.3s ease;}
     .status{margin-top:10px;color:var(--muted);}
     .notification{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);
       border-radius:12px;padding:16px;position:fixed;top:50%;left:50%;
       transform:translate(-50%,-50%);z-index:1000;text-align:center;}
+    /* fullscreen mode */
+    .fullscreen-mode header,
+    .fullscreen-mode .controls,
+    .fullscreen-mode .status{display:none;}
+    .fullscreen-mode .main{padding:0;}
+    .fullscreen-mode video{width:100%;height:100%;max-width:none;border-radius:0;}
+    /* fullscreen toggle button */
+    #fullscreenBtn{
+      position:absolute;bottom:20px;right:20px;
+      background:rgba(0,0,0,0.5);border:none;
+      border-radius:50%;width:48px;height:48px;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;color:#fff;font-size:20px;
+    }
   </style>
 </head>
 <body>
@@ -45,6 +66,7 @@
   <div class="main">
     <video id="remoteVideo" autoplay playsinline></video>
     <div id="debugLog" class="status">Waiting for connection...</div>
+    <button id="fullscreenBtn" title="Toggle Fullscreen">⛶</button>
   </div>
 
   <div id="inviteNotification" class="notification" style="display:none;">
@@ -181,6 +203,12 @@
           updateStatus("Receiving partner screen...");
         }
       });
+    });
+
+    // ---------------- FULLSCREEN TOGGLE ----------------
+    const fullscreenBtn=document.getElementById("fullscreenBtn");
+    fullscreenBtn.addEventListener("click",()=>{
+      document.body.classList.toggle("fullscreen-mode");
     });
   </script>
 </body>
